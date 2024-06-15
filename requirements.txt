@@ -1,0 +1,16 @@
+pandas
+requests
+fastapi
+uvicorn
+python-multipart
+pydantic
+scikit-learn
+pymilvus
+umap-learn
+networkx
+plotly
+wordcloud
+matplotlib
+seaborn
+arabic-reshaper
+python-bidi
