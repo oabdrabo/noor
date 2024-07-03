@@ -1,11 +1,11 @@
 pandas
-requests
 fastapi
 uvicorn
 python-multipart
 pydantic
 scikit-learn
-pymilvus
+sqlite-vec
+sentence-transformers
 umap-learn
 networkx
 plotly
