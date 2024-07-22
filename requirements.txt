@@ -8,9 +8,6 @@ sqlite-vec
 sentence-transformers
 umap-learn
 networkx
-plotly
 wordcloud
-matplotlib
-seaborn
 arabic-reshaper
 python-bidi
