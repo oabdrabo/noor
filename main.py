@@ -255,8 +255,10 @@ async def lifespan(app: FastAPI):
     CURRENT_MODEL = 'intfloat/multilingual-e5-small'
     db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
     stored_model = db.execute("SELECT value FROM meta WHERE key='model'").fetchone()
-    if stored_model and stored_model[0] != CURRENT_MODEL:
-        print(f"[{datetime.now()}] Model changed ({stored_model[0]} -> {CURRENT_MODEL}), rebuilding vectors...", flush=True)
+    need_rebuild = (stored_model is None) or (stored_model[0] != CURRENT_MODEL)
+    if need_rebuild:
+        old = stored_model[0] if stored_model else 'unknown'
+        print(f"[{datetime.now()}] Model changed ({old} -> {CURRENT_MODEL}), rebuilding vectors...", flush=True)
         db.execute('DROP TABLE IF EXISTS quran_vec')
         db.execute('DROP TABLE IF EXISTS hadith_vec')
         db.execute('DELETE FROM quran_metadata')
