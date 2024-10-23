@@ -143,13 +143,13 @@ def search_hadith_vec(db, query_embedding, limit):
 def get_embedding(model, text: str) -> np.ndarray:
     """Get embedding for a single text using the multilingual model."""
     if not text or not str(text).strip():
-        return np.zeros(384, dtype=np.float32)
+        return np.zeros(768, dtype=np.float32)
     try:
         text_str = f"query: {str(text).strip()[:5000]}"
         return np.array(model.encode(text_str), dtype=np.float32)
     except Exception as e:
         logger.error(f"Embedding error: {e}")
-        return np.zeros(384, dtype=np.float32)
+        return np.zeros(768, dtype=np.float32)
 
 
 def get_batch_embeddings(model, texts: list) -> np.ndarray:
@@ -162,7 +162,7 @@ def get_batch_embeddings(model, texts: list) -> np.ndarray:
         return np.array(embeddings, dtype=np.float32)
     except Exception as e:
         logger.error(f"Batch embedding error: {e}")
-        return np.zeros((len(texts), 384), dtype=np.float32)
+        return np.zeros((len(texts), 768), dtype=np.float32)
 
 
 # --------------- clustering ---------------
@@ -231,10 +231,10 @@ async def lifespan(app: FastAPI):
     os.environ.setdefault('TRANSFORMERS_CACHE', '/config/models/huggingface')
 
     # Load single multilingual model (handles Arabic + English)
-    print(f"[{datetime.now()}] Loading multilingual-e5-small model...", flush=True)
+    print(f"[{datetime.now()}] Loading multilingual-e5-base model...", flush=True)
     from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer('intfloat/multilingual-e5-small')
-    print(f"[{datetime.now()}] Model loaded (multilingual-e5-small, 384d)", flush=True)
+    model = SentenceTransformer('intfloat/multilingual-e5-base')
+    print(f"[{datetime.now()}] Model loaded (multilingual-e5-base, 768d)", flush=True)
 
     # Initialize SQLite with sqlite-vec
     print(f"[{datetime.now()}] Initializing SQLite vector database...", flush=True)
@@ -258,20 +258,20 @@ async def lifespan(app: FastAPI):
         text TEXT, translation TEXT
     )''')
     db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS quran_vec USING vec0(
-        embedding float[384] distance_metric=cosine
+        embedding float[768] distance_metric=cosine
     )''')
     db.execute('''CREATE TABLE IF NOT EXISTS hadith_metadata (
         hadith_id INTEGER PRIMARY KEY AUTOINCREMENT,
         collection_name TEXT, hadith_number TEXT, text TEXT, reference TEXT
     )''')
     db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS hadith_vec USING vec0(
-        embedding float[384] distance_metric=cosine
+        embedding float[768] distance_metric=cosine
     )''')
     db.commit()
     print(f"[{datetime.now()}] SQLite tables ready", flush=True)
 
     # Model version tracking — wipe data if model changes
-    CURRENT_MODEL = 'intfloat/multilingual-e5-small'
+    CURRENT_MODEL = 'intfloat/multilingual-e5-base'
     stored_model = db.execute("SELECT value FROM meta WHERE key='model'").fetchone()
     need_rebuild = (stored_model is None) or (stored_model[0] != CURRENT_MODEL)
     if need_rebuild:
@@ -427,7 +427,7 @@ base_domain = os.environ.get("BASE_DOMAIN", "jsr.bz")
 
 app = FastAPI(
     title="Noor - Islamic Knowledge Search API",
-    version="3.0.0",
+    version="4.0.0",
     description="AI-powered Quran and Hadith search with semantic analysis",
     lifespan=lifespan,
 )
@@ -450,7 +450,7 @@ async def root(request: Request):
 
 @app.get("/api")
 async def api_root():
-    return {"message": "Noor API", "version": "3.0", "endpoints": [
+    return {"message": "Noor API", "version": "4.0", "endpoints": [
         "/api/search", "/api/hadith/search", "/api/qa", "/api/count",
         "/api/similar", "/api/tafsir", "/api/export", "/api/analytics/themes"
     ]}
