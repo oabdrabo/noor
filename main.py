@@ -425,12 +425,7 @@ async def lifespan(app: FastAPI):
 
 base_domain = os.environ.get("BASE_DOMAIN", "jsr.bz")
 
-app = FastAPI(
-    title="Noor - Islamic Knowledge Search API",
-    version="4.0.0",
-    description="AI-powered Quran and Hadith search with semantic analysis",
-    lifespan=lifespan,
-)
+app = FastAPI(title="Noor", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -450,7 +445,7 @@ async def root(request: Request):
 
 @app.get("/api")
 async def api_root():
-    return {"message": "Noor API", "version": "4.0", "endpoints": [
+    return {"endpoints": [
         "/api/search", "/api/hadith/search", "/api/qa", "/api/count",
         "/api/similar", "/api/tafsir", "/api/export", "/api/analytics/themes"
     ]}
