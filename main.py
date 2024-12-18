@@ -143,26 +143,26 @@ def search_hadith_vec(db, query_embedding, limit):
 def get_embedding(model, text: str) -> np.ndarray:
     """Get embedding for a single text using the multilingual model."""
     if not text or not str(text).strip():
-        return np.zeros(768, dtype=np.float32)
+        return np.zeros(1024, dtype=np.float32)
     try:
-        text_str = f"query: {str(text).strip()[:5000]}"
+        text_str = str(text).strip()[:5000]
         return np.array(model.encode(text_str), dtype=np.float32)
     except Exception as e:
         logger.error(f"Embedding error: {e}")
-        return np.zeros(768, dtype=np.float32)
+        return np.zeros(1024, dtype=np.float32)
 
 
 def get_batch_embeddings(model, texts: list) -> np.ndarray:
     """Get embeddings for multiple texts."""
     print(f"[{datetime.now()}] Generating embeddings for {len(texts)} texts...", flush=True)
     try:
-        clean = [f"passage: {str(t).strip()[:5000]}" if t and str(t).strip() else "passage: " for t in texts]
+        clean = [str(t).strip()[:5000] if t and str(t).strip() else "" for t in texts]
         embeddings = model.encode(clean, show_progress_bar=True, batch_size=64)
         print(f"[{datetime.now()}] Completed generating {len(embeddings)} embeddings", flush=True)
         return np.array(embeddings, dtype=np.float32)
     except Exception as e:
         logger.error(f"Batch embedding error: {e}")
-        return np.zeros((len(texts), 768), dtype=np.float32)
+        return np.zeros((len(texts), 1024), dtype=np.float32)
 
 
 # --------------- clustering ---------------
@@ -230,11 +230,12 @@ async def lifespan(app: FastAPI):
     os.environ.setdefault('HF_HOME', '/config/models/huggingface')
     os.environ.setdefault('TRANSFORMERS_CACHE', '/config/models/huggingface')
 
-    # Load single multilingual model (handles Arabic + English)
-    print(f"[{datetime.now()}] Loading multilingual-e5-base model...", flush=True)
+    # Load BGE-M3: best multilingual model (Arabic+English), 1024d
+    print(f"[{datetime.now()}] Loading BAAI/bge-m3 model...", flush=True)
     from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer('intfloat/multilingual-e5-base')
-    print(f"[{datetime.now()}] Model loaded (multilingual-e5-base, 768d)", flush=True)
+    import torch
+    model = SentenceTransformer('BAAI/bge-m3', model_kwargs={'torch_dtype': torch.float16})
+    print(f"[{datetime.now()}] Model loaded (bge-m3, 1024d, float16)", flush=True)
 
     # Initialize SQLite with sqlite-vec
     print(f"[{datetime.now()}] Initializing SQLite vector database...", flush=True)
@@ -251,37 +252,41 @@ async def lifespan(app: FastAPI):
     db.execute("PRAGMA temp_store = MEMORY")
     db.execute("PRAGMA mmap_size = 268435456")
 
-    # Create tables first (needed before model version check)
+    # Create non-vec tables first (needed before model version check)
     db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
     db.execute('''CREATE TABLE IF NOT EXISTS quran_metadata (
         verse_id INTEGER PRIMARY KEY, surah INTEGER, ayah INTEGER,
         text TEXT, translation TEXT
     )''')
-    db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS quran_vec USING vec0(
-        embedding float[768] distance_metric=cosine
-    )''')
     db.execute('''CREATE TABLE IF NOT EXISTS hadith_metadata (
         hadith_id INTEGER PRIMARY KEY AUTOINCREMENT,
         collection_name TEXT, hadith_number TEXT, text TEXT, reference TEXT
     )''')
-    db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS hadith_vec USING vec0(
-        embedding float[768] distance_metric=cosine
-    )''')
     db.commit()
-    print(f"[{datetime.now()}] SQLite tables ready", flush=True)
 
-    # Model version tracking — wipe data if model changes
-    CURRENT_MODEL = 'intfloat/multilingual-e5-base'
+    # Model version tracking — drop and recreate vec tables if model changes
+    CURRENT_MODEL = 'BAAI/bge-m3'
     stored_model = db.execute("SELECT value FROM meta WHERE key='model'").fetchone()
     need_rebuild = (stored_model is None) or (stored_model[0] != CURRENT_MODEL)
     if need_rebuild:
         old = stored_model[0] if stored_model else 'unknown'
         print(f"[{datetime.now()}] Model changed ({old} -> {CURRENT_MODEL}), rebuilding vectors...", flush=True)
-        db.execute('DELETE FROM quran_vec')
-        db.execute('DELETE FROM hadith_vec')
+        db.execute('DROP TABLE IF EXISTS quran_vec')
+        db.execute('DROP TABLE IF EXISTS hadith_vec')
         db.execute('DELETE FROM quran_metadata')
         db.execute('DELETE FROM hadith_metadata')
         db.commit()
+
+    # Create vec tables with correct dimensions (1024d for bge-m3)
+    db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS quran_vec USING vec0(
+        embedding float[1024] distance_metric=cosine
+    )''')
+    db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS hadith_vec USING vec0(
+        embedding float[1024] distance_metric=cosine
+    )''')
+    db.commit()
+    print(f"[{datetime.now()}] SQLite tables ready", flush=True)
+
     db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('model', ?)", [CURRENT_MODEL])
     db.commit()
 
