@@ -4,119 +4,191 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Noor</title>
+  <meta name="description" content="AI-powered Quran & Hadith semantic search">
+  <meta name="theme-color" content="#0a0a0f">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     :root{
       color-scheme:dark;
       --bg:#0a0a0f;--bg2:#12121a;--bg3:#1a1a26;
-      --surface:#1e1e2e;--surface2:#262638;
+      --surface:#1e1e2e;--surface2:#262638;--surface3:#2e2e42;
       --border:#2a2a3e;--border2:#3a3a52;
       --text:#e4e4ef;--text2:#9898b0;--text3:#6a6a82;
-      --accent:#6c8aff;--accent2:#8b6cff;--accent3:#4caf8b;
-      --danger:#ef5350;
-      --radius:12px;--radius2:16px;
+      --accent:#6c8aff;--accent2:#8b6cff;--accent3:#4caf8b;--accent4:#ff8c6c;
+      --danger:#ef5350;--warn:#ffa726;
+      --radius:12px;--radius2:16px;--radius3:20px;
       --font:'Inter',system-ui,sans-serif;
-      --font-ar:'Noto Sans Arabic','Inter',sans-serif;
+      --font-ar:'Amiri','Traditional Arabic',serif;
+      --shadow:0 4px 24px rgba(0,0,0,.3);
+      --transition:all .25s cubic-bezier(.4,0,.2,1);
     }
-    body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+    html{scroll-behavior:smooth}
+    body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;overflow-x:hidden}
     a{color:var(--accent);text-decoration:none}
     button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-    input{font-family:inherit;color:inherit;background:none;border:none;outline:none}
+    input,select{font-family:inherit;color:inherit;background:none;border:none;outline:none}
+    ::selection{background:var(--accent);color:white}
 
-    .app{max-width:800px;margin:0 auto;padding:20px}
+    .app{max-width:860px;margin:0 auto;padding:20px 16px 80px}
 
     /* Header */
-    header{text-align:center;padding:48px 0 32px}
-    header h1{font-size:28px;font-weight:700;letter-spacing:-0.5px;margin-bottom:4px}
-    header p{color:var(--text2);font-size:14px}
+    header{text-align:center;padding:40px 0 28px;position:relative}
+    header h1{font-size:32px;font-weight:700;letter-spacing:-1px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    header p{color:var(--text3);font-size:13px;margin-top:2px}
+    .header-actions{position:absolute;top:20px;inset-inline-end:0;display:flex;gap:8px;align-items:center}
+    .icon-btn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--border);transition:var(--transition)}
+    .icon-btn:hover{border-color:var(--accent);background:var(--surface)}
+    .icon-btn svg{width:16px;height:16px;stroke:var(--text2);fill:none;stroke-width:2}
 
     /* Tabs */
-    .tabs{display:flex;gap:4px;padding:4px;background:var(--bg2);border-radius:var(--radius);margin-bottom:20px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .tabs{display:flex;gap:4px;padding:4px;background:var(--bg2);border-radius:var(--radius);margin-bottom:16px;overflow-x:auto;scrollbar-width:none}
     .tabs::-webkit-scrollbar{display:none}
-    .tab{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--text2);white-space:nowrap;transition:all .2s}
-    .tab:hover{color:var(--text)}
-    .tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+    .tab{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--text3);white-space:nowrap;transition:var(--transition);position:relative}
+    .tab:hover{color:var(--text2)}
+    .tab.active{background:var(--surface);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+    .tab .badge{position:absolute;top:2px;inset-inline-end:2px;width:6px;height:6px;background:var(--accent);border-radius:50%}
 
     /* Search */
-    .search-box{position:relative;margin-bottom:16px}
-    .search-box input{width:100%;padding:14px 48px 14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:15px;transition:border-color .2s}
-    .search-box input:focus{border-color:var(--accent)}
-    .search-box input[dir=rtl]{text-align:right;padding:14px 16px 14px 48px}
-    .search-btn{position:absolute;inset-inline-end:4px;top:4px;bottom:4px;width:40px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;transition:opacity .2s}
-    .search-btn:hover{opacity:.85}
+    .search-wrap{position:relative;margin-bottom:12px}
+    .search-box{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:4px;transition:var(--transition)}
+    .search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,138,255,.15)}
+    .search-box input{flex:1;padding:10px 12px;font-size:15px;min-width:0}
+    .search-box input::placeholder{color:var(--text3)}
+    .search-box input[dir=rtl]{text-align:right}
+    .search-btn{width:40px;height:40px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;transition:var(--transition);flex-shrink:0}
+    .search-btn:hover{opacity:.85;transform:scale(1.05)}
+    .search-btn:active{transform:scale(.95)}
     .search-btn svg{width:18px;height:18px;stroke:white;fill:none;stroke-width:2}
+    .search-hint{position:absolute;inset-inline-end:56px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text3);background:var(--bg2);padding:2px 6px;border-radius:4px;border:1px solid var(--border);pointer-events:none}
+
+    /* Filters */
+    .filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+    .filter-select{padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2);cursor:pointer}
+    .filter-select:focus{border-color:var(--accent)}
 
     /* Chips */
     .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
-    .chip{padding:6px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--text2);transition:all .2s}
-    .chip:hover{border-color:var(--accent);color:var(--text)}
+    .chip{padding:6px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--text2);transition:var(--transition)}
+    .chip:hover{border-color:var(--accent);color:var(--text);transform:translateY(-1px)}
 
     /* Stats bar */
-    .stats-bar{display:flex;gap:16px;justify-content:center;padding:12px 0;margin-bottom:24px;color:var(--text3);font-size:13px}
-    .stats-bar span{display:flex;align-items:center;gap:4px}
-    .stats-bar strong{color:var(--text2)}
+    .stats-bar{display:flex;gap:12px;justify-content:center;padding:10px 16px;margin-bottom:20px;color:var(--text3);font-size:12px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)}
+    .stats-bar .stat{display:flex;align-items:center;gap:4px}
+    .stats-bar .stat strong{color:var(--accent);font-variant-numeric:tabular-nums}
+    .stats-bar .dot{width:4px;height:4px;border-radius:50%;background:var(--accent3)}
 
     /* Results */
     .results{display:flex;flex-direction:column;gap:12px}
-    .result{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:20px;transition:border-color .2s}
-    .result:hover{border-color:var(--border2)}
-    .result-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-    .result-ref{font-size:13px;font-weight:600;color:var(--accent);background:rgba(108,138,255,.1);padding:4px 10px;border-radius:6px}
-    .result-score{font-size:12px;color:var(--accent3);font-weight:500}
-    .arabic{font-family:var(--font-ar);font-size:24px;line-height:2;direction:rtl;text-align:right;padding:16px;background:var(--bg2);border-radius:var(--radius);margin-bottom:12px;font-weight:600}
-    .translation{font-size:14px;color:var(--text2);line-height:1.8}
-    .result-footer{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
-    .result-footer button{font-size:12px;color:var(--text3);padding:4px 8px;border-radius:6px;transition:all .2s}
-    .result-footer button:hover{background:var(--bg2);color:var(--text)}
+    .result-enter-active{transition:all .3s ease}
+    .result-enter-from{opacity:0;transform:translateY(12px)}
 
-    /* Hadith result */
+    .result{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:20px;transition:var(--transition);position:relative}
+    .result:hover{border-color:var(--border2);transform:translateY(-1px);box-shadow:var(--shadow)}
+    .result-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px}
+    .result-ref{font-size:13px;font-weight:600;color:var(--accent);background:rgba(108,138,255,.1);padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:4px}
+    .result-score{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+    .score-high{color:var(--accent3)}
+    .score-med{color:var(--warn)}
+    .score-low{color:var(--text3)}
+    .arabic{font-family:var(--font-ar);font-size:26px;line-height:2.2;direction:rtl;text-align:right;padding:16px 20px;background:var(--bg2);border-radius:var(--radius);margin-bottom:12px;font-weight:700;border-inline-start:3px solid var(--accent2)}
+    .translation{font-size:14px;color:var(--text2);line-height:1.9}
+    .result-actions{display:flex;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap}
+    .action-btn{font-size:12px;color:var(--text3);padding:4px 10px;border-radius:6px;transition:var(--transition);display:inline-flex;align-items:center;gap:4px}
+    .action-btn:hover{background:var(--bg2);color:var(--text)}
+    .action-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+    .action-btn.bookmarked{color:var(--accent4)}
+
+    /* Hadith */
     .hadith-collection{font-size:11px;color:var(--accent2);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
-    .hadith-text{font-size:14px;line-height:1.8;color:var(--text2)}
+    .hadith-text{font-size:14px;line-height:1.9;color:var(--text2)}
 
-    /* QA answer */
-    .qa-answer{background:var(--bg2);border-radius:var(--radius);padding:16px;margin-bottom:16px;border-inline-start:3px solid var(--accent)}
-    .qa-answer p{font-size:14px;line-height:1.8;color:var(--text)}
+    /* QA */
+    .qa-answer{background:linear-gradient(135deg,rgba(108,138,255,.08),rgba(139,108,255,.08));border-radius:var(--radius2);padding:20px;margin-bottom:16px;border-inline-start:3px solid var(--accent)}
+    .qa-answer p{font-size:14px;line-height:1.9;color:var(--text)}
     .qa-type{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px}
 
-    /* Count result */
+    /* Count */
     .count-result{text-align:center;padding:32px}
-    .count-number{font-size:48px;font-weight:700;color:var(--accent)}
+    .count-number{font-size:56px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .count-label{font-size:14px;color:var(--text2);margin-top:4px}
 
     /* Themes */
-    .theme-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+    .theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+    .theme-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:var(--transition)}
+    .theme-card:hover{border-color:var(--accent);transform:translateY(-2px)}
     .theme-title{font-size:14px;font-weight:600;margin-bottom:4px}
     .theme-keywords{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
-    .theme-kw{font-size:11px;background:var(--bg2);padding:2px 8px;border-radius:4px;color:var(--text2)}
+    .theme-kw{font-size:11px;background:var(--bg2);padding:3px 8px;border-radius:4px;color:var(--text2)}
     .theme-size{font-size:12px;color:var(--text3)}
 
+    /* Surah browser */
+    .surah-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+    .surah-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center;transition:var(--transition);cursor:pointer}
+    .surah-item:hover{border-color:var(--accent);transform:translateY(-2px)}
+    .surah-num{font-size:11px;color:var(--text3);margin-bottom:2px}
+    .surah-name{font-size:13px;font-weight:600}
+    .surah-verses{font-size:11px;color:var(--text3);margin-top:2px}
+
+    /* Analytics */
+    .analytics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center}
+    .stat-card .num{font-size:28px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+    .stat-card .label{font-size:12px;color:var(--text3);margin-top:2px}
+    .dist-bar{display:flex;align-items:center;gap:8px;padding:8px 0}
+    .dist-label{font-size:12px;color:var(--text2);width:140px;flex-shrink:0;text-align:end}
+    .dist-track{flex:1;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden}
+    .dist-fill{height:100%;border-radius:4px;transition:width .6s ease}
+
+    /* Bookmarks panel */
+    .bookmarks-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:20px;margin-bottom:20px}
+    .bookmarks-panel h3{font-size:15px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .bookmark-item{display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg2);border-radius:8px;margin-bottom:6px;font-size:13px}
+    .bookmark-item:last-child{margin-bottom:0}
+    .no-bookmarks{text-align:center;color:var(--text3);font-size:13px;padding:20px}
+
     /* Loading */
-    .loading{display:flex;justify-content:center;padding:48px}
-    .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+    .loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:48px}
+    .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-text{font-size:13px;color:var(--text3)}
+
+    /* Skeleton */
+    .skeleton{background:linear-gradient(90deg,var(--surface) 25%,var(--surface2) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:var(--radius)}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .skeleton-result{height:160px;margin-bottom:12px;border-radius:var(--radius2)}
 
     /* Empty */
     .empty{text-align:center;padding:48px 20px;color:var(--text3)}
+    .empty svg{width:48px;height:48px;stroke:var(--border2);fill:none;stroke-width:1.5;margin-bottom:12px}
     .empty h3{color:var(--text2);font-size:16px;margin-bottom:4px}
     .empty p{font-size:14px}
 
     /* Error */
-    .error{text-align:center;padding:32px;color:var(--danger);font-size:14px}
+    .error-box{text-align:center;padding:24px;background:rgba(239,83,80,.08);border:1px solid rgba(239,83,80,.2);border-radius:var(--radius);color:var(--danger);font-size:14px;margin-bottom:16px}
 
     /* Toast */
-    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--border);padding:10px 20px;border-radius:var(--radius);font-size:13px;opacity:0;transition:all .3s;z-index:100}
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface2);border:1px solid var(--border2);padding:10px 20px;border-radius:var(--radius);font-size:13px;opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);z-index:100;box-shadow:var(--shadow)}
     .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+    /* Kbd shortcut */
+    kbd{font-family:var(--font);font-size:10px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:1px 4px;color:var(--text3)}
 
     /* Responsive */
     @media(max-width:600px){
-      .app{padding:12px}
-      header{padding:32px 0 20px}
-      header h1{font-size:22px}
-      .arabic{font-size:20px;padding:12px}
-      .tab{padding:6px 10px;font-size:12px}
+      .app{padding:12px 10px 80px}
+      header{padding:28px 0 16px}
+      header h1{font-size:26px}
+      .header-actions{top:12px}
+      .arabic{font-size:22px;padding:12px 14px}
+      .tab{padding:7px 10px;font-size:12px}
+      .search-hint{display:none}
+      .surah-grid{grid-template-columns:repeat(auto-fill,minmax(90px,1fr))}
+      .analytics-grid{grid-template-columns:1fr 1fr}
+      .dist-label{width:100px;font-size:11px}
+      .filters{gap:6px}
     }
   </style>
 </head>
@@ -125,44 +197,84 @@
   <div class="app">
     <header>
       <h1>Noor</h1>
-      <p>Quran & Hadith Semantic Search</p>
+      <p>AI-Powered Quran & Hadith Search</p>
+      <div class="header-actions">
+        <button class="icon-btn" @click="showBookmarks=!showBookmarks" :title="bookmarks.length+' bookmarks'">
+          <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+        </button>
+      </div>
     </header>
 
     <!-- Stats -->
     <div class="stats-bar" v-if="stats">
-      <span><strong>{{stats.indexed_verses?.toLocaleString()}}</strong> verses</span>
-      <span><strong>{{stats.total_hadiths?.toLocaleString()}}</strong> hadiths</span>
-      <span><strong>{{stats.status}}</strong></span>
+      <span class="stat"><span class="dot"></span> <strong>{{fmt(stats.indexed_verses)}}</strong> verses</span>
+      <span class="stat"><strong>{{fmt(stats.total_hadiths)}}</strong> hadiths</span>
+      <span class="stat" :style="{color:stats.status==='Ready'?'var(--accent3)':'var(--warn)'}">{{stats.status}}</span>
+    </div>
+
+    <!-- Bookmarks panel -->
+    <div class="bookmarks-panel" v-if="showBookmarks">
+      <h3><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--accent4);fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> Bookmarks ({{bookmarks.length}})</h3>
+      <div v-if="bookmarks.length">
+        <div class="bookmark-item" v-for="(b,i) in bookmarks" :key="b.ref">
+          <span style="cursor:pointer" @click="query=b.ref;mode='tafsir';search()">
+            <strong style="color:var(--accent)">{{b.ref}}</strong>
+            <span style="color:var(--text3);margin-inline-start:8px">{{b.text?.slice(0,60)}}...</span>
+          </span>
+          <button class="action-btn" @click="removeBookmark(i)" style="color:var(--danger)">
+            <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="no-bookmarks" v-else>No bookmarks yet. Click the bookmark icon on any verse to save it.</div>
     </div>
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab" :class="{active:mode===m.id}" v-for="m in modes" @click="mode=m.id;query=m.example||query">{{m.label}}</button>
-    </div>
-
-    <!-- Search -->
-    <div class="search-box">
-      <input
-        ref="searchInput"
-        v-model="query"
-        :placeholder="currentMode.placeholder"
-        :dir="isArabic(query)?'rtl':'ltr'"
-        @keydown.enter="search">
-      <button class="search-btn" @click="search">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <button class="tab" :class="{active:mode===m.id}" v-for="m in modes" :key="m.id" @click="switchMode(m)">
+        {{m.label}}
+        <span class="badge" v-if="m.id==='bookmarks'&&bookmarks.length"></span>
       </button>
     </div>
 
-    <!-- Quick chips -->
-    <div class="chips" v-if="!results.length && !loading">
-      <button class="chip" v-for="s in suggestions" @click="query=s.q;search()">{{s.label}}</button>
+    <!-- Search -->
+    <div class="search-wrap" v-if="currentMode.hasSearch!==false">
+      <div class="search-box">
+        <input
+          ref="searchInput"
+          v-model="query"
+          :placeholder="currentMode.placeholder"
+          :dir="isArabic(query)?'rtl':'ltr'"
+          @keydown.enter="search"
+          @keydown.escape="query=''">
+        <button class="search-btn" @click="search" :disabled="loading">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+      </div>
+      <span class="search-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd></span>
     </div>
 
-    <!-- Loading -->
-    <div class="loading" v-if="loading"><div class="spinner"></div></div>
+    <!-- Filters for search modes -->
+    <div class="filters" v-if="(mode==='search'||mode==='advanced') && searched">
+      <select class="filter-select" v-model.number="surahFilter" @change="search()">
+        <option :value="0">All Surahs</option>
+        <option v-for="n in 114" :value="n">Surah {{n}}</option>
+      </select>
+      <span style="font-size:12px;color:var(--text3)" v-if="results.length">{{results.length}} results</span>
+    </div>
+
+    <!-- Quick chips -->
+    <div class="chips" v-if="!results.length && !loading && !searched">
+      <button class="chip" v-for="s in suggestions" :key="s.q" @click="query=s.q;mode=s.mode||'search';search()">{{s.label}}</button>
+    </div>
+
+    <!-- Loading skeleton -->
+    <div v-if="loading">
+      <div class="skeleton skeleton-result" v-for="n in 3" :key="n"></div>
+    </div>
 
     <!-- Error -->
-    <div class="error" v-if="error">{{error}}</div>
+    <div class="error-box" v-if="error">{{error}}</div>
 
     <!-- Results -->
     <div class="results" v-if="!loading && !error">
@@ -170,29 +282,35 @@
       <!-- QA mode -->
       <template v-if="mode==='qa' && qaAnswer">
         <div class="qa-answer">
-          <div class="qa-type">{{qaAnswer.question_type}}</div>
+          <div class="qa-type">{{qaAnswer.question_type}} &middot; {{qaAnswer.sources_count}} sources</div>
           <p>{{qaAnswer.answer}}</p>
         </div>
-        <div class="result" v-for="r in qaAnswer.relevant_verses">
-          <div class="result-head">
-            <span class="result-ref">{{r.surah}}:{{r.ayah}}</span>
-            <span class="result-score">{{pct(r.score)}}</span>
+        <template v-for="(r,i) in qaAnswer.relevant_verses" :key="i">
+          <div class="result" :style="{animationDelay:i*60+'ms'}">
+            <div class="result-head">
+              <span class="result-ref">{{r.surah}}:{{r.ayah}}</span>
+              <span class="result-score" :class="scoreClass(r.score)">{{pct(r.score)}}</span>
+            </div>
+            <div class="arabic" v-if="r.text">{{r.text}}</div>
+            <div class="translation">{{r.translation}}</div>
+            <div class="result-actions">
+              <button class="action-btn" @click="copy(r)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button>
+              <button class="action-btn" :class="{bookmarked:isBookmarked(r)}" @click="toggleBookmark(r)"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{isBookmarked(r)?'Saved':'Save'}}</button>
+            </div>
           </div>
-          <div class="arabic" v-if="r.text">{{r.text}}</div>
-          <div class="translation">{{r.translation}}</div>
-        </div>
+        </template>
       </template>
 
       <!-- Count mode -->
       <template v-else-if="mode==='count' && countResult">
         <div class="count-result">
-          <div class="count-number">{{countResult.count.toLocaleString()}}</div>
-          <div class="count-label">"{{countResult.word}}" found in {{countResult.total_verses_with_word}} verses</div>
+          <div class="count-number">{{fmt(countResult.count)}}</div>
+          <div class="count-label">"{{countResult.word}}" found in {{fmt(countResult.total_verses_with_word)}} verses</div>
         </div>
-        <div class="result" v-for="e in countResult.examples">
+        <div class="result" v-for="(e,i) in countResult.examples" :key="i">
           <div class="result-head">
             <span class="result-ref">{{e.surah}}:{{e.ayah}}</span>
-            <span class="result-score">{{e.matches}} matches</span>
+            <span class="result-score score-high">{{e.matches}} matches</span>
           </div>
           <div class="translation">{{e.text}}</div>
         </div>
@@ -200,12 +318,79 @@
 
       <!-- Themes mode -->
       <template v-else-if="mode==='themes' && themes">
-        <div class="results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
-          <div class="theme-card" v-for="(t,id) in themes">
+        <div class="theme-grid">
+          <div class="theme-card" v-for="(t,id) in themes" :key="id">
             <div class="theme-title">Cluster {{id}}</div>
             <div class="theme-size">{{t.size}} verses</div>
             <div class="theme-keywords">
-              <span class="theme-kw" v-for="k in t.keywords">{{k}}</span>
+              <span class="theme-kw" v-for="k in t.keywords" :key="k">{{k}}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Analytics mode -->
+      <template v-else-if="mode==='analytics'">
+        <div class="analytics-grid" v-if="analyticsData">
+          <div class="stat-card">
+            <div class="num">{{fmt(analyticsData.surah?.total_surahs||114)}}</div>
+            <div class="label">Surahs</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">{{fmt(analyticsData.surah?.total_verses||0)}}</div>
+            <div class="label">Total Verses</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">{{analyticsData.surah?.average_verses_per_surah||0}}</div>
+            <div class="label">Avg per Surah</div>
+          </div>
+          <div class="stat-card">
+            <div class="num">{{fmt(analyticsData.frequency?.total_unique_words||0)}}</div>
+            <div class="label">Unique Words</div>
+          </div>
+        </div>
+        <h3 style="font-size:14px;color:var(--text2);margin-bottom:12px" v-if="distribution">Theme Distribution</h3>
+        <div v-if="distribution">
+          <div class="dist-bar" v-for="(val,theme) in distribution" :key="theme">
+            <div class="dist-label">{{theme}}</div>
+            <div class="dist-track">
+              <div class="dist-fill" :style="{width:distPct(val)+'%',background:distColor(theme)}"></div>
+            </div>
+            <span style="font-size:11px;color:var(--text3);width:40px;text-align:end">{{fmt(val)}}</span>
+          </div>
+        </div>
+        <div style="margin-top:20px" v-if="wordcloudImg">
+          <h3 style="font-size:14px;color:var(--text2);margin-bottom:12px">Word Cloud</h3>
+          <img :src="wordcloudImg" style="width:100%;border-radius:var(--radius);border:1px solid var(--border)" alt="Word cloud">
+        </div>
+      </template>
+
+      <!-- Browse surah mode -->
+      <template v-else-if="mode==='browse'">
+        <div v-if="!browseSurah">
+          <div class="surah-grid">
+            <div class="surah-item" v-for="n in 114" :key="n" @click="loadSurah(n)">
+              <div class="surah-num">{{n}}</div>
+              <div class="surah-name">Surah {{n}}</div>
+            </div>
+          </div>
+        </div>
+        <div v-else>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <button class="action-btn" @click="browseSurah=null" style="font-size:14px"><svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> All Surahs</button>
+            <span style="font-size:13px;color:var(--text2)">{{browseSurahData?.total_verses}} verses</span>
+          </div>
+          <div class="result" v-for="v in browseSurahData?.verses||[]" :key="v.ayah">
+            <div class="result-head">
+              <span class="result-ref">{{browseSurah}}:{{v.ayah}}</span>
+            </div>
+            <div class="arabic" v-if="v.text">{{v.text}}</div>
+            <div class="translation" v-if="v.translation">{{v.translation}}</div>
+            <div class="result-actions">
+              <button class="action-btn" @click="copy({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button>
+              <button class="action-btn" :class="{bookmarked:isBookmarked({surah:browseSurah,ayah:v.ayah})}" @click="toggleBookmark({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></button>
+              <button class="action-btn" @click="query=v.translation||v.text;mode='search';search()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Similar</button>
+              <button class="action-btn" @click="shareVerse({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> Share</button>
             </div>
           </div>
         </div>
@@ -213,36 +398,39 @@
 
       <!-- Search / Hadith / Similar / Tafsir results -->
       <template v-else>
-        <!-- Tafsir note -->
+        <!-- Tafsir header -->
         <div v-if="tafsirData" class="qa-answer" style="margin-bottom:12px">
           <div class="arabic" v-if="tafsirData.verse">{{tafsirData.verse}}</div>
           <div class="translation">{{tafsirData.translation}}</div>
           <p style="margin-top:8px;font-size:13px;color:var(--text3)">{{tafsirData.note}}</p>
         </div>
 
-        <div class="result" v-for="r in results">
+        <div class="result" v-for="(r,i) in results" :key="i" :style="{animationDelay:i*40+'ms'}">
           <div class="result-head">
             <span class="result-ref" v-if="r.surah">{{r.surah}}:{{r.ayah}}</span>
             <span class="result-ref" v-else-if="r.collection">
               <span class="hadith-collection">{{r.collection}}</span> #{{r.hadith_number}}
             </span>
-            <span class="result-score" v-if="r.score">{{pct(r.score)}}</span>
+            <span class="result-score" :class="scoreClass(r.score||r.final_score)" v-if="r.score||r.final_score">{{pct(r.score||r.final_score)}}</span>
           </div>
           <div class="arabic" v-if="r.text && isArabic(r.text)">{{r.text}}</div>
           <div class="hadith-text" v-else-if="r.text">{{r.text}}</div>
           <div class="translation" v-if="r.translation">{{r.translation}}</div>
-          <div class="result-footer">
-            <button @click="copy(r)">Copy</button>
-            <button v-if="r.surah" @click="query=r.surah+':'+r.ayah;mode='tafsir';search()">Tafsir</button>
-            <button v-if="r.surah" @click="query=r.translation||r.text;mode='search';search()">Similar</button>
+          <div class="result-actions">
+            <button class="action-btn" @click="copy(r)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button>
+            <button class="action-btn" :class="{bookmarked:isBookmarked(r)}" v-if="r.surah" @click="toggleBookmark(r)"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{isBookmarked(r)?'Saved':'Save'}}</button>
+            <button class="action-btn" v-if="r.surah" @click="query=r.surah+':'+r.ayah;mode='tafsir';search()"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg> Tafsir</button>
+            <button class="action-btn" v-if="r.surah" @click="query=r.translation||r.text;mode='search';search()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Similar</button>
+            <button class="action-btn" @click="shareVerse(r)"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> Share</button>
           </div>
         </div>
       </template>
 
-      <!-- Empty -->
-      <div class="empty" v-if="!loading && !error && !results.length && !qaAnswer && !countResult && !themes && !tafsirData && searched">
-        <h3>No results</h3>
-        <p>Try different keywords or a different mode</p>
+      <!-- Empty state -->
+      <div class="empty" v-if="!loading && !error && !results.length && !qaAnswer && !countResult && !themes && !tafsirData && searched && mode!=='analytics' && mode!=='browse'">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <h3>No results found</h3>
+        <p>Try different keywords or switch to another search mode</p>
       </div>
     </div>
   </div>
@@ -251,7 +439,7 @@
 </div>
 
 <script>
-const{createApp,ref,computed,onMounted,nextTick}=Vue
+const{createApp,ref,computed,onMounted,onUnmounted,nextTick,watch}=Vue
 
 createApp({
   setup(){
@@ -269,43 +457,76 @@ createApp({
     const toast=ref('')
     const searched=ref(false)
     const searchInput=ref(null)
+    const surahFilter=ref(0)
+    const showBookmarks=ref(false)
+    const bookmarks=ref(JSON.parse(localStorage.getItem('noor-bookmarks')||'[]'))
+    const analyticsData=ref(null)
+    const distribution=ref(null)
+    const wordcloudImg=ref(null)
+    const browseSurah=ref(null)
+    const browseSurahData=ref(null)
 
     const modes=[
-      {id:'search',label:'Search',placeholder:'Search Quran verses...',example:''},
-      {id:'hadith',label:'Hadith',placeholder:'Search hadith collections...',example:''},
-      {id:'qa',label:'Q&A',placeholder:'Ask a question about Islam...',example:'What is the importance of prayer?'},
-      {id:'similar',label:'Similar',placeholder:'Find similar verses (enter text or reference)...',example:'2:255'},
-      {id:'tafsir',label:'Tafsir',placeholder:'Enter verse reference (e.g. 2:255)...',example:'2:255'},
-      {id:'count',label:'Count',placeholder:'Count word occurrences...',example:'mercy'},
-      {id:'themes',label:'Themes',placeholder:'',example:''},
+      {id:'search',label:'Search',placeholder:'Search Quran verses...',hasSearch:true},
+      {id:'hadith',label:'Hadith',placeholder:'Search hadith collections...',hasSearch:true},
+      {id:'qa',label:'Q&A',placeholder:'Ask about Islam...',hasSearch:true},
+      {id:'similar',label:'Similar',placeholder:'Find similar verses (text or ref)...',hasSearch:true},
+      {id:'tafsir',label:'Tafsir',placeholder:'Verse reference (e.g. 2:255)...',hasSearch:true},
+      {id:'count',label:'Count',placeholder:'Count word occurrences...',hasSearch:true},
+      {id:'browse',label:'Browse',placeholder:'',hasSearch:false},
+      {id:'themes',label:'Themes',placeholder:'',hasSearch:false},
+      {id:'analytics',label:'Analytics',placeholder:'',hasSearch:false},
     ]
 
     const currentMode=computed(()=>modes.find(m=>m.id===mode.value)||modes[0])
 
     const suggestions=[
-      {label:'Ayatul Kursi',q:'2:255'},{label:'Al-Fatiha',q:'1:1'},
       {label:'Patience',q:'patience'},{label:'Mercy',q:'mercy'},
-      {label:'Prayer',q:'What is the importance of prayer?'},
+      {label:'Ayatul Kursi',q:'2:255',mode:'tafsir'},
+      {label:'Prayer',q:'What is the importance of prayer?',mode:'qa'},
       {label:'Paradise',q:'paradise description'},
-      {label:'Prophet Muhammad',q:'Prophet Muhammad'},
+      {label:'Prophet Muhammad',q:'Prophet Muhammad',mode:'hadith'},
       {label:'Forgiveness',q:'forgiveness'},{label:'Justice',q:'justice'},
-      {label:'Fasting',q:'Ramadan fasting'},{label:'Marriage',q:'marriage in Islam'},
-      {label:'Angels',q:'angels'},
+      {label:'Ramadan',q:'Ramadan fasting'},{label:'Angels',q:'angels'},
+      {label:'Knowledge',q:'knowledge and learning'},{label:'Marriage',q:'marriage'},
     ]
+
+    const distColors=['#6c8aff','#8b6cff','#4caf8b','#ff8c6c','#ffa726','#ef5350','#26c6da','#ab47bc']
 
     function isArabic(t){return t&&/[\u0600-\u06FF]/.test(t)}
     function pct(s){return s!=null?Math.round(s*100)+'%':''}
+    function fmt(n){return n!=null?Number(n).toLocaleString():'0'}
+    function scoreClass(s){return s>0.75?'score-high':s>0.5?'score-med':'score-low'}
+    function distPct(val){
+      if(!distribution.value)return 0
+      const max=Math.max(...Object.values(distribution.value))
+      return max?Math.round(val/max*100):0
+    }
+    function distColor(theme){
+      const keys=Object.keys(distribution.value||{})
+      return distColors[keys.indexOf(theme)%distColors.length]
+    }
+
+    function switchMode(m){
+      mode.value=m.id
+      searched.value=false;results.value=[];qaAnswer.value=null;countResult.value=null;themes.value=null;tafsirData.value=null;error.value=''
+      if(m.id==='themes')loadThemes()
+      else if(m.id==='analytics')loadAnalytics()
+      else if(m.id==='browse'){browseSurah.value=null;browseSurahData.value=null}
+      else nextTick(()=>searchInput.value?.focus())
+    }
 
     async function search(){
       const q=query.value.trim()
-      if(!q&&mode.value!=='themes')return
+      if(!q&&currentMode.value?.hasSearch!==false)return
       loading.value=true;error.value='';results.value=[];qaAnswer.value=null;countResult.value=null;themes.value=null;tafsirData.value=null;searched.value=true
 
       try{
         let data
+        const sf=surahFilter.value||null
         switch(mode.value){
           case 'search':
-            data=await post(`${API}/search`,{query:q,limit:20})
+            data=await post(`${API}/search`,{query:q,limit:20,surah_filter:sf})
             results.value=data.results||[]
             break
           case 'hadith':
@@ -317,7 +538,7 @@ createApp({
             qaAnswer.value=data
             break
           case 'similar':
-            data=await post(`${API}/similar`,{reference:q,query:q,limit:10})
+            data=await post(`${API}/similar`,{reference:q,query:q,limit:15})
             results.value=data.similar_verses||data.results||[]
             break
           case 'tafsir':
@@ -329,16 +550,48 @@ createApp({
             data=await post(`${API}/count`,{word:q})
             countResult.value=data
             break
-          case 'themes':
-            data=await get(`${API}/analytics/themes`)
-            themes.value=data.themes||{}
-            break
         }
       }catch(e){
         error.value=e.message||'Request failed'
       }finally{
         loading.value=false
       }
+    }
+
+    async function loadThemes(){
+      loading.value=true;error.value=''
+      try{
+        const data=await get(`${API}/analytics/themes`)
+        themes.value=data.themes||{}
+      }catch(e){error.value=e.message}
+      finally{loading.value=false}
+    }
+
+    async function loadAnalytics(){
+      loading.value=true;error.value=''
+      try{
+        const[surah,freq,dist,wc]=await Promise.allSettled([
+          get(`${API}/analytics/surah`),
+          get(`${API}/analytics/frequency`),
+          get(`${API}/analytics/distribution`),
+          get(`${API}/analytics/wordcloud`),
+        ])
+        analyticsData.value={
+          surah:surah.status==='fulfilled'?surah.value:null,
+          frequency:freq.status==='fulfilled'?freq.value:null,
+        }
+        distribution.value=dist.status==='fulfilled'?dist.value?.themes:null
+        wordcloudImg.value=wc.status==='fulfilled'?wc.value?.wordcloud_image:null
+      }catch(e){error.value=e.message}
+      finally{loading.value=false}
+    }
+
+    async function loadSurah(n){
+      browseSurah.value=n;loading.value=true;error.value=''
+      try{
+        browseSurahData.value=await get(`${API}/search/surah/${n}`)
+      }catch(e){error.value=e.message}
+      finally{loading.value=false}
     }
 
     async function post(url,body){
@@ -352,19 +605,60 @@ createApp({
       return r.json()
     }
 
+    // Bookmarks
+    function saveBookmarks(){localStorage.setItem('noor-bookmarks',JSON.stringify(bookmarks.value))}
+    function isBookmarked(r){return bookmarks.value.some(b=>b.ref===`${r.surah}:${r.ayah}`)}
+    function toggleBookmark(r){
+      const ref=`${r.surah}:${r.ayah}`
+      const idx=bookmarks.value.findIndex(b=>b.ref===ref)
+      if(idx>=0){bookmarks.value.splice(idx,1);showToast('Bookmark removed')}
+      else{bookmarks.value.unshift({ref,text:r.translation||r.text||''});showToast('Bookmarked')}
+      saveBookmarks()
+    }
+    function removeBookmark(i){bookmarks.value.splice(i,1);saveBookmarks();showToast('Removed')}
+
+    // Copy & Share
     function copy(r){
       const t=r.translation||r.text||''
       const ref=r.surah?`${r.surah}:${r.ayah}`:(r.collection?`${r.collection} #${r.hadith_number}`:'')
-      navigator.clipboard.writeText(`${ref}\n${t}`).then(()=>showToast('Copied'))
+      navigator.clipboard.writeText(`${ref}\n${t}`).then(()=>showToast('Copied to clipboard'))
     }
+    function shareVerse(r){
+      const text=r.translation||r.text||''
+      const ref=r.surah?`Quran ${r.surah}:${r.ayah}`:(r.collection?`${r.collection} #${r.hadith_number}`:'')
+      if(navigator.share){
+        navigator.share({title:'Noor',text:`${ref}\n${text}`}).catch(()=>{})
+      }else{
+        copy(r)
+      }
+    }
+
     function showToast(msg){toast.value=msg;setTimeout(()=>toast.value='',2000)}
 
+    // Keyboard shortcut
+    function onKeydown(e){
+      if((e.ctrlKey||e.metaKey)&&e.key==='k'){
+        e.preventDefault()
+        if(currentMode.value?.hasSearch===false){mode.value='search'}
+        nextTick(()=>searchInput.value?.focus())
+      }
+    }
+
     onMounted(async()=>{
+      document.addEventListener('keydown',onKeydown)
       try{stats.value=await get(`${API}/stats`)}catch(e){}
       nextTick(()=>searchInput.value?.focus())
     })
+    onUnmounted(()=>document.removeEventListener('keydown',onKeydown))
 
-    return{query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,tafsirData,stats,toast,searched,suggestions,searchInput,isArabic,pct,search,copy}
+    return{
+      query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,tafsirData,
+      stats,toast,searched,suggestions,searchInput,surahFilter,showBookmarks,bookmarks,
+      analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,
+      isArabic,pct,fmt,scoreClass,distPct,distColor,
+      switchMode,search,loadSurah,copy,shareVerse,
+      isBookmarked,toggleBookmark,removeBookmark,showToast
+    }
   }
 }).mount('#app')
 </script>
