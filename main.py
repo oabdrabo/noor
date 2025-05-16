@@ -247,39 +247,17 @@ class QAQuery(BaseModel):
 
 # --------------- lifespan ---------------
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Modern FastAPI lifespan: load models and data once at startup."""
-    print("Starting Noor - Islamic Knowledge Search API...", flush=True)
-    print(f"[{datetime.now()}] Starting lifespan startup", flush=True)
-
-    # Model cache on PVC for persistence
-    os.environ.setdefault('SENTENCE_TRANSFORMERS_HOME', '/config/models')
-    os.environ.setdefault('HF_HOME', '/config/models/huggingface')
-    os.environ.setdefault('TRANSFORMERS_CACHE', '/config/models/huggingface')
-
-    # Load BGE-M3: best multilingual model (Arabic+English), 1024d
-    print(f"[{datetime.now()}] Loading BAAI/bge-m3 model...", flush=True)
-    from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer('BAAI/bge-m3')
-    print(f"[{datetime.now()}] Model loaded (bge-m3, 1024d)", flush=True)
-
-    # Initialize SQLite with sqlite-vec
-    print(f"[{datetime.now()}] Initializing SQLite vector database...", flush=True)
+def _init_db():
+    """Initialize SQLite with sqlite-vec, create tables, return connection."""
     import sqlite_vec
     db = sqlite3.connect('/config/vectors.db', check_same_thread=False)
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
-
-    # Performance PRAGMAs
-    db.execute("PRAGMA journal_mode = WAL")
-    db.execute("PRAGMA synchronous = NORMAL")
-    db.execute("PRAGMA cache_size = 10000")
-    db.execute("PRAGMA temp_store = MEMORY")
-    db.execute("PRAGMA mmap_size = 268435456")
-
-    # Create non-vec tables first (needed before model version check)
+    for pragma in ["PRAGMA journal_mode = WAL", "PRAGMA synchronous = NORMAL",
+                    "PRAGMA cache_size = 10000", "PRAGMA temp_store = MEMORY",
+                    "PRAGMA mmap_size = 268435456"]:
+        db.execute(pragma)
     db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
     db.execute('''CREATE TABLE IF NOT EXISTS quran_metadata (
         verse_id INTEGER PRIMARY KEY, surah INTEGER, ayah INTEGER,
@@ -290,155 +268,192 @@ async def lifespan(app: FastAPI):
         collection_name TEXT, hadith_number TEXT, text TEXT, reference TEXT
     )''')
     db.commit()
+    return db
 
-    # Model version tracking — drop and recreate vec tables if model changes
-    CURRENT_MODEL = 'BAAI/bge-m3'
-    stored_model = db.execute("SELECT value FROM meta WHERE key='model'").fetchone()
-    need_rebuild = (stored_model is None) or (stored_model[0] != CURRENT_MODEL)
-    if need_rebuild:
-        old = stored_model[0] if stored_model else 'unknown'
-        print(f"[{datetime.now()}] Model changed ({old} -> {CURRENT_MODEL}), rebuilding vectors...", flush=True)
+
+def _ensure_model_version(db, model_name):
+    """Drop vec tables if model changed. Create vec tables."""
+    stored = db.execute("SELECT value FROM meta WHERE key='model'").fetchone()
+    if stored is None or stored[0] != model_name:
+        old = stored[0] if stored else 'none'
+        print(f"[{datetime.now()}] Model changed ({old} -> {model_name}), rebuilding...", flush=True)
         db.execute('DROP TABLE IF EXISTS quran_vec')
         db.execute('DROP TABLE IF EXISTS hadith_vec')
         db.execute('DELETE FROM quran_metadata')
         db.execute('DELETE FROM hadith_metadata')
         db.commit()
-
-    # Create vec tables with correct dimensions (1024d for bge-m3)
     db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS quran_vec USING vec0(
         embedding float[1024] distance_metric=cosine
     )''')
     db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS hadith_vec USING vec0(
         embedding float[1024] distance_metric=cosine
     )''')
-    db.commit()
-    print(f"[{datetime.now()}] SQLite tables ready", flush=True)
-
-    # Indexes for faster metadata lookups
     db.execute('CREATE INDEX IF NOT EXISTS idx_quran_surah ON quran_metadata(surah, ayah)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_hadith_collection ON hadith_metadata(collection_name)')
-    db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('model', ?)", [CURRENT_MODEL])
+    db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('model', ?)", [model_name])
     db.commit()
 
+
+def _background_index(app):
+    """Build vector indexes incrementally in background thread.
+
+    Processes verses/hadiths in small batches with commits after each,
+    so progress survives crashes and restarts resume where they left off.
+    """
+    import threading
+    s = app.state
+    BATCH = 64
+
+    def _run():
+        try:
+            # --- Quran vectors ---
+            total = len(s.df_verses)
+            existing = s.db.execute('SELECT COUNT(*) FROM quran_vec').fetchone()[0]
+            if existing >= total:
+                print(f"[{datetime.now()}] Quran vectors cached ({existing}), skipping", flush=True)
+                s.quran_ready = True
+            else:
+                ar_col = _col(s.df_verses, 'ayah_ar', 'text')
+                en_col = _col(s.df_verses, 'ayah_en', 'translation')
+                sc_col = _col(s.df_verses, 'surah_no', 'surah')
+                ac_col = _col(s.df_verses, 'ayah_no_surah', 'ayah')
+                texts = (s.df_verses[ar_col].fillna('').astype(str) + ' ' +
+                         s.df_verses[en_col].fillna('').astype(str)).tolist()
+
+                if existing > 0:
+                    print(f"[{datetime.now()}] Resuming quran index from {existing}/{total}", flush=True)
+                else:
+                    print(f"[{datetime.now()}] Building quran vector index ({total} verses)...", flush=True)
+
+                for i in range(existing, total, BATCH):
+                    batch_texts = texts[i:i + BATCH]
+                    batch_emb = s.model.encode(batch_texts, batch_size=8)
+                    meta_rows = []
+                    vec_rows = []
+                    for j, idx in enumerate(range(i, min(i + BATCH, total))):
+                        row = s.df_verses.iloc[idx]
+                        meta_rows.append((idx, int(row[sc_col]), int(row[ac_col]),
+                                          str(row.get(ar_col, ''))[:5000],
+                                          str(row.get(en_col, ''))[:5000]))
+                        vec_rows.append((idx, serialize_f32(np.array(batch_emb[j], dtype=np.float32))))
+                    s.db.executemany('INSERT OR REPLACE INTO quran_metadata VALUES (?,?,?,?,?)', meta_rows)
+                    s.db.executemany('INSERT INTO quran_vec (rowid, embedding) VALUES (?,?)', vec_rows)
+                    s.db.commit()
+                    done = min(i + BATCH, total)
+                    s.index_progress = f"Quran: {done}/{total}"
+                    if done % 256 == 0 or done == total:
+                        print(f"[{datetime.now()}] Indexed {done}/{total} quran verses", flush=True)
+
+                s.quran_ready = True
+                print(f"[{datetime.now()}] Quran index complete ({total} verses)", flush=True)
+
+            # --- Hadith vectors ---
+            hadith_count = s.db.execute('SELECT COUNT(*) FROM hadith_vec').fetchone()[0]
+            if hadith_count > 0:
+                print(f"[{datetime.now()}] Hadith vectors cached ({hadith_count}), skipping", flush=True)
+                s.hadith_ready = True
+            else:
+                print(f"[{datetime.now()}] Downloading hadith collections...", flush=True)
+                import urllib.request
+                hadith_records = []
+                for url, name in [
+                    ("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari.json", "Sahih Bukhari"),
+                    ("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-muslim.json", "Sahih Muslim"),
+                ]:
+                    with urllib.request.urlopen(url, timeout=30) as resp:
+                        data = json.loads(resp.read())
+                    print(f"[{datetime.now()}] {name}: {len(data['hadiths'])} hadiths", flush=True)
+                    for h in data['hadiths']:
+                        hadith_records.append({
+                            'collection': name,
+                            'hadith_number': str(h.get('hadithNumber', '')),
+                            'text': h.get('text', '')[:9900],
+                            'reference': f"{name.split()[-1]} {h.get('hadithNumber', '')}"
+                        })
+
+                df_hadith = pd.DataFrame(hadith_records)
+                total_h = len(df_hadith)
+                print(f"[{datetime.now()}] Indexing {total_h} hadiths...", flush=True)
+                hadith_texts = [str(t).strip()[:2000] if t and str(t).strip() else "[No text]"
+                                for t in df_hadith['text']]
+
+                for i in range(0, total_h, BATCH):
+                    batch = hadith_texts[i:i + BATCH]
+                    batch_emb = s.model.encode(batch, batch_size=8)
+                    batch_df = df_hadith.iloc[i:i + len(batch)]
+                    meta_rows = [(r['collection'], str(r['hadith_number']), str(r['text']), r['reference'])
+                                 for _, r in batch_df.iterrows()]
+                    s.db.executemany('INSERT INTO hadith_metadata (collection_name, hadith_number, text, reference) VALUES (?,?,?,?)', meta_rows)
+                    last_id = s.db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                    start_id = last_id - len(batch) + 1
+                    vec_rows = [(start_id + j, serialize_f32(np.array(batch_emb[j], dtype=np.float32)))
+                                for j in range(len(batch))]
+                    s.db.executemany('INSERT INTO hadith_vec (rowid, embedding) VALUES (?,?)', vec_rows)
+                    s.db.commit()
+                    done = min(i + BATCH, total_h)
+                    s.index_progress = f"Hadith: {done}/{total_h}"
+                    if done % 256 == 0 or done == total_h:
+                        print(f"[{datetime.now()}] Indexed {done}/{total_h} hadiths", flush=True)
+
+                s.hadith_ready = True
+                print(f"[{datetime.now()}] Hadith index complete ({total_h} hadiths)", flush=True)
+
+            s.index_progress = "Ready"
+            print(f"[{datetime.now()}] INDEXING COMPLETE - ALL READY!", flush=True)
+        except Exception as e:
+            logger.error(f"Background indexing error: {e}")
+            import traceback
+            traceback.print_exc()
+            s.index_progress = f"Error: {e}"
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load model and data, start API immediately, index vectors in background."""
+    print("Starting Noor - Islamic Knowledge Search API...", flush=True)
+    print(f"[{datetime.now()}] Starting lifespan startup", flush=True)
+
+    os.environ.setdefault('SENTENCE_TRANSFORMERS_HOME', '/config/models')
+    os.environ.setdefault('HF_HOME', '/config/models/huggingface')
+    os.environ.setdefault('TRANSFORMERS_CACHE', '/config/models/huggingface')
+
+    # Load model
+    print(f"[{datetime.now()}] Loading BAAI/bge-m3 model...", flush=True)
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer('BAAI/bge-m3')
+    print(f"[{datetime.now()}] Model loaded (bge-m3, 1024d)", flush=True)
+
+    # Init SQLite
+    db = _init_db()
+    _ensure_model_version(db, 'BAAI/bge-m3')
+    print(f"[{datetime.now()}] SQLite tables ready", flush=True)
+
     # Load dataset
-    print(f"[{datetime.now()}] Loading Quran dataset...", flush=True)
     df_verses = pd.read_csv('/config/quran-dataset.csv')
     print(f"[{datetime.now()}] Loaded {len(df_verses)} verses", flush=True)
 
-    # Index quran vectors (skip if already done)
-    quran_count = db.execute('SELECT COUNT(*) FROM quran_vec').fetchone()[0]
-    if quran_count == 0:
-        print(f"[{datetime.now()}] Building quran vector index...", flush=True)
-        ar_col = _col(df_verses, 'ayah_ar', 'text')
-        en_col = _col(df_verses, 'ayah_en', 'translation')
-        texts = (df_verses[ar_col].fillna('').astype(str) + ' ' + df_verses[en_col].fillna('').astype(str)).tolist()
-
-        embeddings = get_batch_embeddings(model, texts)
-        print(f"[{datetime.now()}] Batch inserting {len(texts)} verses...", flush=True)
-
-        sc_col = _col(df_verses, 'surah_no', 'surah')
-        ac_col = _col(df_verses, 'ayah_no_surah', 'ayah')
-        meta_rows = [(i, int(r[sc_col]), int(r[ac_col]),
-                       str(r.get(ar_col, ''))[:5000], str(r.get(en_col, ''))[:5000])
-                      for i, (_, r) in enumerate(df_verses.iterrows())]
-        vec_rows = [(i, serialize_f32(embeddings[i])) for i in range(len(texts))]
-
-        db.executemany('INSERT OR REPLACE INTO quran_metadata (verse_id, surah, ayah, text, translation) VALUES (?, ?, ?, ?, ?)', meta_rows)
-        db.executemany('INSERT INTO quran_vec (rowid, embedding) VALUES (?, ?)', vec_rows)
-        db.commit()
-        print(f"[{datetime.now()}] Quran index built ({len(texts)} verses)", flush=True)
-    else:
-        print(f"[{datetime.now()}] Quran vectors cached ({quran_count}), skipping", flush=True)
-
-    print(f"[{datetime.now()}] Quran vector database ready!", flush=True)
-
-    # Analytics deferred to first request (saves 15-20s startup)
-    verse_embeddings = None
-    cluster_model = None
-    theme_labels = None
-
-    # Index hadiths
-    hadith_ready = False
-    hadith_count = db.execute('SELECT COUNT(*) FROM hadith_vec').fetchone()[0]
-    if hadith_count == 0:
-        try:
-            print(f"[{datetime.now()}] Downloading Hadith collections...", flush=True)
-            import urllib.request
-            bukhari_url = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari.json"
-            muslim_url = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-muslim.json"
-
-            with urllib.request.urlopen(bukhari_url, timeout=30) as resp:
-                bukhari_data = json.loads(resp.read())
-            print(f"[{datetime.now()}] Bukhari: {len(bukhari_data['hadiths'])} hadiths", flush=True)
-
-            with urllib.request.urlopen(muslim_url, timeout=30) as resp:
-                muslim_data = json.loads(resp.read())
-            print(f"[{datetime.now()}] Muslim: {len(muslim_data['hadiths'])} hadiths", flush=True)
-
-            hadith_records = []
-            for src, name in [(bukhari_data, 'Sahih Bukhari'), (muslim_data, 'Sahih Muslim')]:
-                for h in src['hadiths']:
-                    text = h.get('text', '')[:9900]
-                    hadith_records.append({
-                        'collection': name,
-                        'hadith_number': str(h.get('hadithNumber', '')),
-                        'text': text,
-                        'reference': f"{name.split()[-1]} {h.get('hadithNumber', '')}"
-                    })
-
-            df_hadith = pd.DataFrame(hadith_records)
-            print(f"[{datetime.now()}] Total hadiths: {len(df_hadith)}", flush=True)
-
-            hadith_texts = [str(t).strip() if t and str(t).strip() else "[No text]" for t in df_hadith['text']]
-            batch_size = 500
-            hid_counter = 1
-            for i in range(0, len(hadith_texts), batch_size):
-                try:
-                    batch = hadith_texts[i:i+batch_size]
-                    batch_emb = get_batch_embeddings(model, batch)
-                    batch_df = df_hadith.iloc[i:i+len(batch)]
-                    meta_rows = [(r['collection'], str(r['hadith_number']), str(r['text']), r['reference'])
-                                  for _, r in batch_df.iterrows()]
-                    db.executemany('INSERT INTO hadith_metadata (collection_name, hadith_number, text, reference) VALUES (?, ?, ?, ?)', meta_rows)
-                    # Get the rowid range for vec inserts
-                    last_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
-                    start_id = last_id - len(batch) + 1
-                    vec_rows = [(start_id + j, serialize_f32(batch_emb[j])) for j in range(len(batch))]
-                    db.executemany('INSERT INTO hadith_vec (rowid, embedding) VALUES (?, ?)', vec_rows)
-                    if (i + batch_size) % 2000 == 0:
-                        print(f"  Indexed {min(i + batch_size, len(hadith_texts))}/{len(hadith_texts)} hadiths...", flush=True)
-                except Exception as batch_err:
-                    logger.error(f"Hadith batch {i//batch_size} error: {batch_err}")
-                    continue
-            db.commit()
-            hadith_count = db.execute('SELECT COUNT(*) FROM hadith_vec').fetchone()[0]
-            print(f"[{datetime.now()}] Hadith index built ({hadith_count} hadiths)", flush=True)
-            hadith_ready = True
-        except Exception as e:
-            logger.error(f"Hadith init failed: {e}")
-            import traceback
-            traceback.print_exc()
-    else:
-        print(f"[{datetime.now()}] Hadith vectors cached ({hadith_count}), skipping", flush=True)
-        hadith_ready = True
-
-    print(f"[{datetime.now()}] STARTUP COMPLETE - API READY!", flush=True)
-
-    # Store everything on app.state
+    # Set state immediately so API can start accepting requests
     app.state.model = model
     app.state.db = db
     app.state.df_verses = df_verses
-    app.state.verse_embeddings = verse_embeddings
-    app.state.cluster_model = cluster_model
-    app.state.theme_labels = theme_labels
-    app.state.hadith_ready = hadith_ready
-    app.state.quran_ready = True
-    # Cache for expensive operations
+    app.state.verse_embeddings = None
+    app.state.cluster_model = None
+    app.state.theme_labels = None
+    app.state.quran_ready = False
+    app.state.hadith_ready = False
+    app.state.index_progress = "Starting..."
     app.state.cache = {}
+
+    # Start background indexing (incremental, crash-resilient)
+    _background_index(app)
+
+    print(f"[{datetime.now()}] API STARTED - indexing in background", flush=True)
 
     yield
 
-    # Shutdown
     db.close()
     print("Noor shutdown complete.", flush=True)
 
@@ -477,13 +492,12 @@ async def api_root():
 async def health_status(request: Request):
     s = request.app.state
     return {
-        "status": "healthy",
+        "status": "ready" if getattr(s, 'quran_ready', False) else "indexing",
         "quran_ready": getattr(s, 'quran_ready', False),
         "hadith_ready": getattr(s, 'hadith_ready', False),
+        "index_progress": getattr(s, 'index_progress', 'Starting...'),
         "total_verses": len(s.df_verses) if s.df_verses is not None else 0,
         "sqlite_connected": s.db is not None,
-        "endpoints": ["/api/search", "/api/qa", "/api/similar", "/api/tafsir",
-                       "/api/count", "/api/analytics/themes", "/api/export", "/api/hadith/search"]
     }
 
 
@@ -492,8 +506,9 @@ async def health_status(request: Request):
 @app.post("/api/search")
 async def search_verses(query: SearchQuery, request: Request):
     s = request.app.state
-    if not s.quran_ready or s.df_verses is None:
-        raise HTTPException(status_code=503, detail="System loading")
+    if not getattr(s, 'quran_ready', False):
+        return {"results": [], "total": 0, "indexing": True,
+                "progress": getattr(s, 'index_progress', 'Starting...')}
 
     try:
         if not query.query or not query.query.strip():
@@ -560,8 +575,9 @@ async def search_verses(query: SearchQuery, request: Request):
 @app.post("/api/hadith/search")
 async def search_hadith(query: SearchQuery, request: Request):
     s = request.app.state
-    if not s.hadith_ready:
-        raise HTTPException(status_code=503, detail="Hadith system loading")
+    if not getattr(s, 'hadith_ready', False):
+        return {"results": [], "total": 0, "indexing": True,
+                "progress": getattr(s, 'index_progress', 'Starting...')}
 
     try:
         qe = get_embedding(s.model, query.query)
@@ -575,8 +591,8 @@ async def search_hadith(query: SearchQuery, request: Request):
 @app.post("/api/search/advanced")
 async def advanced_search(query: SearchQuery, request: Request):
     s = request.app.state
-    if not s.quran_ready or s.df_verses is None:
-        raise HTTPException(status_code=503, detail="System loading")
+    if not getattr(s, 'quran_ready', False):
+        return {"results": [], "indexing": True, "progress": getattr(s, 'index_progress', 'Starting...')}
 
     try:
         qe = get_embedding(s.model, query.query)
@@ -610,8 +626,8 @@ async def advanced_search(query: SearchQuery, request: Request):
 @app.post("/api/search/multi-vector")
 async def multi_vector_search(query: SearchQuery, request: Request):
     s = request.app.state
-    if not s.quran_ready or s.df_verses is None:
-        raise HTTPException(status_code=503, detail="System loading")
+    if not getattr(s, 'quran_ready', False):
+        return {"results": [], "total": 0, "indexing": True, "progress": getattr(s, 'index_progress', 'Starting...')}
 
     try:
         semantic_weight, keyword_weight = 0.7, 0.3
@@ -676,8 +692,9 @@ async def multi_vector_search(query: SearchQuery, request: Request):
 @app.post("/api/qa/islamic")
 async def islamic_qa(query: QAQuery, request: Request):
     s = request.app.state
-    if not s.quran_ready or s.df_verses is None:
-        raise HTTPException(status_code=503, detail="System loading")
+    if not getattr(s, 'quran_ready', False):
+        return {"answer": "System is indexing, please wait...", "relevant_verses": [],
+                "indexing": True, "progress": getattr(s, 'index_progress', 'Starting...')}
 
     try:
         qe = get_embedding(s.model, query.question)
@@ -1107,8 +1124,8 @@ async def tafsir_endpoint(req: Dict[str, Any], request: Request):
 @app.post("/api/analytics/export")
 async def export_search(req: dict, request: Request):
     s = request.app.state
-    if not s.quran_ready or s.df_verses is None:
-        raise HTTPException(status_code=503, detail="System loading")
+    if not getattr(s, 'quran_ready', False):
+        return {"data": [], "count": 0, "indexing": True, "progress": getattr(s, 'index_progress', 'Starting...')}
 
     search_query = req.get("query", "")
     fmt = req.get("format", "json")
