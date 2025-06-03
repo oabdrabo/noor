@@ -158,12 +158,15 @@ def search_hadith_vec(db, query_embedding, limit):
 
 # --------------- embedding ---------------
 
+MODEL_NAME = 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+EMBED_DIM = 384
+
 _embedding_cache = {}
 
 def get_embedding(model, text: str) -> np.ndarray:
     """Get embedding for a single text using the multilingual model. LRU cached."""
     if not text or not str(text).strip():
-        return np.zeros(1024, dtype=np.float32)
+        return np.zeros(EMBED_DIM, dtype=np.float32)
     text_str = str(text).strip()[:2000]
     if text_str in _embedding_cache:
         return _embedding_cache[text_str]
@@ -175,7 +178,7 @@ def get_embedding(model, text: str) -> np.ndarray:
         return result
     except Exception as e:
         logger.error(f"Embedding error: {e}")
-        return np.zeros(1024, dtype=np.float32)
+        return np.zeros(EMBED_DIM, dtype=np.float32)
 
 
 def get_batch_embeddings(model, texts: list) -> np.ndarray:
@@ -183,12 +186,12 @@ def get_batch_embeddings(model, texts: list) -> np.ndarray:
     print(f"[{datetime.now()}] Generating embeddings for {len(texts)} texts...", flush=True)
     try:
         clean = [str(t).strip()[:2000] if t and str(t).strip() else "" for t in texts]
-        embeddings = model.encode(clean, show_progress_bar=True, batch_size=8)
+        embeddings = model.encode(clean, show_progress_bar=True, batch_size=32)
         print(f"[{datetime.now()}] Completed generating {len(embeddings)} embeddings", flush=True)
         return np.array(embeddings, dtype=np.float32)
     except Exception as e:
         logger.error(f"Batch embedding error: {e}")
-        return np.zeros((len(texts), 1024), dtype=np.float32)
+        return np.zeros((len(texts), EMBED_DIM), dtype=np.float32)
 
 
 # --------------- clustering ---------------
@@ -282,11 +285,11 @@ def _ensure_model_version(db, model_name):
         db.execute('DELETE FROM quran_metadata')
         db.execute('DELETE FROM hadith_metadata')
         db.commit()
-    db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS quran_vec USING vec0(
-        embedding float[1024] distance_metric=cosine
+    db.execute(f'''CREATE VIRTUAL TABLE IF NOT EXISTS quran_vec USING vec0(
+        embedding float[{EMBED_DIM}] distance_metric=cosine
     )''')
-    db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS hadith_vec USING vec0(
-        embedding float[1024] distance_metric=cosine
+    db.execute(f'''CREATE VIRTUAL TABLE IF NOT EXISTS hadith_vec USING vec0(
+        embedding float[{EMBED_DIM}] distance_metric=cosine
     )''')
     db.execute('CREATE INDEX IF NOT EXISTS idx_quran_surah ON quran_metadata(surah, ayah)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_hadith_collection ON hadith_metadata(collection_name)')
@@ -327,7 +330,7 @@ def _background_index(app):
 
                 for i in range(existing, total, BATCH):
                     batch_texts = texts[i:i + BATCH]
-                    batch_emb = s.model.encode(batch_texts, batch_size=8)
+                    batch_emb = s.model.encode(batch_texts, batch_size=32)
                     meta_rows = []
                     vec_rows = []
                     for j, idx in enumerate(range(i, min(i + BATCH, total))):
@@ -379,7 +382,7 @@ def _background_index(app):
 
                 for i in range(0, total_h, BATCH):
                     batch = hadith_texts[i:i + BATCH]
-                    batch_emb = s.model.encode(batch, batch_size=8)
+                    batch_emb = s.model.encode(batch, batch_size=32)
                     batch_df = df_hadith.iloc[i:i + len(batch)]
                     meta_rows = [(r['collection'], str(r['hadith_number']), str(r['text']), r['reference'])
                                  for _, r in batch_df.iterrows()]
@@ -421,14 +424,14 @@ async def lifespan(app: FastAPI):
     os.environ.setdefault('TRANSFORMERS_CACHE', '/config/models/huggingface')
 
     # Load model
-    print(f"[{datetime.now()}] Loading BAAI/bge-m3 model...", flush=True)
+    print(f"[{datetime.now()}] Loading {MODEL_NAME}...", flush=True)
     from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer('BAAI/bge-m3')
-    print(f"[{datetime.now()}] Model loaded (bge-m3, 1024d)", flush=True)
+    model = SentenceTransformer(MODEL_NAME)
+    print(f"[{datetime.now()}] Model loaded ({EMBED_DIM}d)", flush=True)
 
     # Init SQLite
     db = _init_db()
-    _ensure_model_version(db, 'BAAI/bge-m3')
+    _ensure_model_version(db, MODEL_NAME)
     print(f"[{datetime.now()}] SQLite tables ready", flush=True)
 
     # Load dataset
