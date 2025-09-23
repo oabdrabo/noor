@@ -6,6 +6,4 @@ pydantic>=2.12.5
 scikit-learn>=1.8.0
 sqlite-vec>=0.1.6
 sentence-transformers>=5.2.3
-umap-learn>=0.5.11
-networkx>=3.6.1
 wordcloud>=1.9.6
