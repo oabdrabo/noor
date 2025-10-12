@@ -1,7 +1,6 @@
 pandas>=3.0.1
 fastapi>=0.115.1
 uvicorn>=0.34.0
-python-multipart>=0.0.22
 pydantic>=2.12.5
 scikit-learn>=1.8.0
 sqlite-vec>=0.1.6

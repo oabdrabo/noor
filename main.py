@@ -361,7 +361,7 @@ async def root(request: Request):
     s = request.app.state
     return {
         "message": "Noor API",
-        "status": "ready" if getattr(s, 'quran_ready', False) else "indexing",
+        "status": "ready" if s.quran_ready else "indexing",
         "verses": len(s.df_verses) if s.df_verses is not None else 0,
     }
 
