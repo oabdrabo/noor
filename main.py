@@ -2,16 +2,15 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
-from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
 from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 import json
-import requests
-import base64
 import os
 import io
 import base64
+import struct
+import sqlite3
 from typing import List, Dict, Any, Optional
 import logging
 from datetime import datetime
@@ -57,8 +56,13 @@ app.add_middleware(
 
 # Global variables for AI models and data
 model = None
+db = None
+arabic_model = None
+arabic_tokenizer = None
 collection = None
+hadith_collection = None
 df_verses = None
+df_hadith = None
 verse_embeddings = None
 cluster_model = None
 theme_labels = None
@@ -136,66 +140,97 @@ class QAQuery(BaseModel):
     question: str
     context_limit: int = 5
 
-# Global variables for models
-EMBEDDINGS_URL = "http://embeddings.vector-memory.svc.cluster.local:8080/vectors"
-arabic_model = None
-arabic_tokenizer = None
-collection = None
-hadith_collection = None
-df_verses = None
-df_hadith = None
-verse_embeddings = None
-cluster_model = None
-theme_labels = None
+# SQLite-vec helpers
+def serialize_f32(vector):
+    """Serialize a vector to bytes for sqlite-vec"""
+    if isinstance(vector, np.ndarray):
+        return vector.astype(np.float32).tobytes()
+    return struct.pack(f'{len(vector)}f', *vector)
 
-# Helper function to get embeddings from service
+def search_quran_vec(query_embedding, limit):
+    """Search quran vectors and return results with metadata"""
+    if db is None:
+        return []
+    query_bytes = serialize_f32(query_embedding)
+    vec_results = db.execute(
+        'SELECT rowid, distance FROM quran_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?',
+        [query_bytes, limit]
+    ).fetchall()
+    if not vec_results:
+        return []
+    rowids = [r[0] for r in vec_results]
+    distances = {r[0]: r[1] for r in vec_results}
+    placeholders = ','.join('?' * len(rowids))
+    metadata = db.execute(
+        f'SELECT verse_id, surah, ayah, text, translation FROM quran_metadata WHERE verse_id IN ({placeholders})',
+        rowids
+    ).fetchall()
+    meta_map = {m[0]: m for m in metadata}
+    results = []
+    for rowid in rowids:
+        m = meta_map.get(rowid)
+        if m:
+            results.append({
+                'surah': m[1], 'ayah': m[2], 'text': m[3], 'translation': m[4],
+                'score': max(0.0, 1.0 - distances[rowid])
+            })
+    return results
+
+def search_hadith_vec(query_embedding, limit):
+    """Search hadith vectors and return results with metadata"""
+    if db is None:
+        return []
+    query_bytes = serialize_f32(query_embedding)
+    vec_results = db.execute(
+        'SELECT rowid, distance FROM hadith_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?',
+        [query_bytes, limit]
+    ).fetchall()
+    if not vec_results:
+        return []
+    rowids = [r[0] for r in vec_results]
+    distances = {r[0]: r[1] for r in vec_results}
+    placeholders = ','.join('?' * len(rowids))
+    metadata = db.execute(
+        f'SELECT hadith_id, collection_name, hadith_number, text, reference FROM hadith_metadata WHERE hadith_id IN ({placeholders})',
+        rowids
+    ).fetchall()
+    meta_map = {m[0]: m for m in metadata}
+    results = []
+    for rowid in rowids:
+        m = meta_map.get(rowid)
+        if m:
+            results.append({
+                'collection': m[1], 'hadith_number': m[2], 'text': m[3], 'reference': m[4],
+                'score': max(0.0, 1.0 - distances[rowid])
+            })
+    return results
+
+# Embedding functions
 def get_embedding(text):
-    """Get embedding from the embeddings service"""
-    # Handle empty or None text
+    """Get embedding using local sentence-transformers model"""
+    global model
     if not text or not str(text).strip():
-        print(f"⚠️ Empty text provided, using random embedding")
-        return np.random.rand(384).tolist()
-
+        return np.zeros(384, dtype=np.float32)
     try:
-        # Ensure text is string and not too long
         text_str = str(text).strip()[:5000]
-
-        response = requests.post(
-            EMBEDDINGS_URL,
-            json={"text": text_str},
-            timeout=10
-        )
-        if response.status_code == 200:
-            data = response.json()
-            return np.array(data.get("vector", data.get("data", [])))
-        else:
-            print(f"⚠️ Embeddings service error: {response.status_code} for text: {text_str[:100]}")
-            return np.random.rand(384).tolist()
+        embedding = model.encode(text_str)
+        return np.array(embedding, dtype=np.float32)
     except Exception as e:
-        print(f"⚠️ Failed to get embedding: {e}")
-        return np.random.rand(384).tolist()
+        print(f"Embedding error: {e}")
+        return np.zeros(384, dtype=np.float32)
 
 def get_batch_embeddings(texts):
-    """Get embeddings for multiple texts"""
+    """Get embeddings for multiple texts using local model"""
+    global model
     print(f"[{datetime.now()}] Generating embeddings for {len(texts)} texts...", flush=True)
-    embeddings = []
-    batch_size = 50
-
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i+batch_size]
-            # Submit batch in parallel
-            futures = [executor.submit(get_embedding, text) for text in batch]
-            # Collect results in submission order to preserve alignment with verse IDs
-            for future in futures:
-                embeddings.append(future.result())
-
-            if i % 200 == 0:
-                print(f"[{datetime.now()}]   Processed {min(i+batch_size, len(texts))}/{len(texts)} embeddings", flush=True)
-
-    print(f"[{datetime.now()}] Completed generating {len(embeddings)} embeddings", flush=True)
-    return np.array(embeddings)
+    try:
+        clean_texts = [str(t).strip()[:5000] if t and str(t).strip() else "" for t in texts]
+        embeddings = model.encode(clean_texts, show_progress_bar=True, batch_size=64)
+        print(f"[{datetime.now()}] Completed generating {len(embeddings)} embeddings", flush=True)
+        return np.array(embeddings, dtype=np.float32)
+    except Exception as e:
+        print(f"Batch embedding error: {e}")
+        return np.zeros((len(texts), 384), dtype=np.float32)
 
 # Helper function to normalize Arabic text
 def normalize_arabic(text):
@@ -207,19 +242,19 @@ def normalize_arabic(text):
     text = ''.join([c for c in text if unicodedata.category(c) != 'Mn'])
     # Replace special Arabic characters with standard ones
     replacements = {
-        'ٱ': 'ا',  # Alif with waslah to regular alif
-        'أ': 'ا',  # Alif with hamza above
-        'إ': 'ا',  # Alif with hamza below
-        'آ': 'ا',  # Alif with madda
-        'ٰ': '',   # Arabic small high ligature alif
-        'ۚ': '',   # Arabic small high jeem
-        'ۖ': '',   # Arabic small high ligature sad with lam with alif maksura
-        'ۗ': '',   # Arabic small high ligature qaf with lam with alif maksura
-        'ۙ': '',   # Arabic small high meem initial form
-        'ۛ': '',   # Arabic small high sad
-        'ۜ': '',   # Arabic small high ain
-        'ى': 'ي',  # Alif maksura to ya
-        'ة': 'ه',  # Ta marbuta to ha
+        '\u0671': '\u0627',  # Alif with waslah to regular alif
+        '\u0623': '\u0627',  # Alif with hamza above
+        '\u0625': '\u0627',  # Alif with hamza below
+        '\u0622': '\u0627',  # Alif with madda
+        '\u0670': '',   # Arabic small high ligature alif
+        '\u06DA': '',   # Arabic small high jeem
+        '\u06D6': '',   # Arabic small high ligature sad with lam with alif maksura
+        '\u06D7': '',   # Arabic small high ligature qaf with lam with alif maksura
+        '\u06D9': '',   # Arabic small high meem initial form
+        '\u06DB': '',   # Arabic small high sad
+        '\u06DC': '',   # Arabic small high ain
+        '\u0649': '\u064A',  # Alif maksura to ya
+        '\u0629': '\u0647',  # Ta marbuta to ha
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
@@ -247,376 +282,169 @@ def get_hybrid_embedding(text, target_dim=384):
 
             # Ensure correct dimension - ALWAYS resize to target_dim
             if len(arabic_embedding) != target_dim:
-                # Resize Arabic-BERT embedding from 768 to 384 by truncating
-                # This preserves the most important features
                 if len(arabic_embedding) > target_dim:
                     return arabic_embedding[:target_dim]
                 else:
-                    # Pad if somehow smaller (shouldn't happen)
                     return np.pad(arabic_embedding, (0, target_dim - len(arabic_embedding)))
             else:
                 return arabic_embedding
         else:
-            # Use embeddings service (384 dimensions)
-            multi_embedding = get_embedding(text)
-
-            # Return 384-dimensional embedding
-            return multi_embedding
+            # Use local sentence-transformers model (384 dimensions natively)
+            return get_embedding(text)
 
     except Exception as e:
         print(f"Hybrid embedding error: {e}")
-        # Emergency fallback with proper dimension
-        base_embedding = get_embedding(text)
-        return base_embedding[:target_dim] if len(base_embedding) > target_dim else np.pad(base_embedding, (0, target_dim - len(base_embedding)))
+        return get_embedding(text)
 
 @app.on_event("startup")
 async def startup_event():
-    global model, arabic_model, arabic_tokenizer, collection, df_verses, verse_embeddings, cluster_model, theme_labels
+    global model, arabic_model, arabic_tokenizer, collection, db, df_verses, verse_embeddings, cluster_model, theme_labels, hadith_collection, df_hadith
 
-    print("🚀 Starting comprehensive Quran AI Search & Analytics API...")
+    print("Starting Quran AI Search & Analytics API...", flush=True)
     print(f"[{datetime.now()}] Starting startup_event function", flush=True)
 
-    # Import asyncio for handling blocking operations
-    import asyncio
-    from functools import partial
+    # Set model cache directory to PVC for persistence
+    os.environ.setdefault('SENTENCE_TRANSFORMERS_HOME', '/config/models')
+    os.environ.setdefault('HF_HOME', '/config/models/huggingface')
+    os.environ.setdefault('TRANSFORMERS_CACHE', '/config/models/huggingface')
 
-    # Initialize advanced Arabic-optimized models
-    print("📥 Loading Arabic-optimized transformers...")
-
-    # Primary model: Arabic-BERT for Classical Arabic
+    # Load Arabic-BERT model
+    print(f"[{datetime.now()}] Loading Arabic-optimized transformers...", flush=True)
     try:
         from transformers import AutoTokenizer, AutoModel
-        print(f"[{datetime.now()}] 🔄 Loading Arabic-BERT model...", flush=True)
+        print(f"[{datetime.now()}] Loading Arabic-BERT model...", flush=True)
         arabic_tokenizer = AutoTokenizer.from_pretrained('aubmindlab/bert-base-arabertv2')
         print(f"[{datetime.now()}] Tokenizer loaded", flush=True)
         arabic_model = AutoModel.from_pretrained('aubmindlab/bert-base-arabertv2')
-        print(f"[{datetime.now()}] ✅ Arabic-BERT loaded successfully", flush=True)
+        print(f"[{datetime.now()}] Arabic-BERT loaded successfully", flush=True)
     except Exception as e:
-        print(f"⚠️ Arabic-BERT failed, using fallback: {e}")
+        print(f"Arabic-BERT failed, using fallback: {e}", flush=True)
         arabic_model = None
         arabic_tokenizer = None
 
-    # Use external embeddings service
-    print("📥 Using external embeddings service...")
+    # Load sentence-transformers model for embeddings
+    print(f"[{datetime.now()}] Loading sentence-transformers model...", flush=True)
     try:
-        # Create a model wrapper for external embeddings
-        class ExternalEmbeddingsModel:
-            def encode(self, texts):
-                if isinstance(texts, str):
-                    return np.array([get_embedding(texts)])
-                elif isinstance(texts, list):
-                    return np.array([get_embedding(text) for text in texts])
-                else:
-                    return np.array([get_embedding(str(text)) for text in texts])
-
-        model = ExternalEmbeddingsModel()
-        print("✅ External embeddings model wrapper created")
-
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        print(f"[{datetime.now()}] sentence-transformers model loaded (all-MiniLM-L6-v2, 384d)", flush=True)
     except Exception as e:
-        print(f"⚠️ Embeddings service test failed: {e}")
+        print(f"sentence-transformers failed: {e}", flush=True)
         # Emergency fallback to TF-IDF
-        from sklearn.feature_extraction.text import TfidfVectorizer
-
         class TfidfModel:
             def __init__(self):
                 self.vectorizer = TfidfVectorizer(max_features=384)
                 self.fitted = False
 
-            def encode(self, texts):
+            def encode(self, texts, **kwargs):
+                if isinstance(texts, str):
+                    texts = [texts]
                 if not self.fitted:
                     self.vectorizer.fit(texts)
                     self.fitted = True
                 sparse = self.vectorizer.transform(texts)
                 dense = sparse.todense()
-                # Ensure 384 dimensions
                 result = np.zeros((len(texts), 384))
                 result[:, :min(384, dense.shape[1])] = dense[:, :min(384, dense.shape[1])]
+                if len(texts) == 1:
+                    return result[0].astype(np.float32)
                 return result.astype(np.float32)
 
         model = TfidfModel()
-        print("✅ Using TF-IDF embeddings as fallback")
+        print("Using TF-IDF embeddings as fallback", flush=True)
 
-    # Now get_hybrid_embedding is already defined globally and can use the models
+    # Initialize SQLite with sqlite-vec
+    print(f"[{datetime.now()}] Initializing SQLite vector database...", flush=True)
+    import sqlite_vec
+    db = sqlite3.connect('/config/vectors.db', check_same_thread=False)
+    db.enable_load_extension(True)
+    sqlite_vec.load(db)
+    db.enable_load_extension(False)
 
-    # Connect to Milvus with retry logic
-    print(f"[{datetime.now()}] 🔗 Connecting to Milvus...", flush=True)
-    max_retries = 30
-    retry_delay = 2
-    
-    for attempt in range(max_retries):
-        try:
-            connections.connect("default", host="milvus-standalone.vector-memory.svc.cluster.local", port="19530")
-            print(f"[{datetime.now()}] ✅ Connected to Milvus", flush=True)
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"[{datetime.now()}] ⚠️ Milvus connection attempt {attempt + 1}/{max_retries} failed: {e}", flush=True)
-                print(f"[{datetime.now()}] ⏳ Retrying in {retry_delay} seconds...", flush=True)
-                import time
-                time.sleep(retry_delay)
-            else:
-                print(f"[{datetime.now()}] ❌ Failed to connect to Milvus after {max_retries} attempts", flush=True)
-                print(f"[{datetime.now()}] 🔧 Starting without Milvus - search features will be limited", flush=True)
-                # Set collection to None to indicate Milvus is unavailable
-                collection = None
+    # Create tables
+    db.execute('''CREATE TABLE IF NOT EXISTS quran_metadata (
+        verse_id INTEGER PRIMARY KEY,
+        surah INTEGER,
+        ayah INTEGER,
+        text TEXT,
+        translation TEXT
+    )''')
+    db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS quran_vec USING vec0(
+        embedding float[384] distance_metric=cosine
+    )''')
+    db.execute('''CREATE TABLE IF NOT EXISTS hadith_metadata (
+        hadith_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        collection_name TEXT,
+        hadith_number TEXT,
+        text TEXT,
+        reference TEXT
+    )''')
+    db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS hadith_vec USING vec0(
+        embedding float[384] distance_metric=cosine
+    )''')
+    db.commit()
+    print(f"[{datetime.now()}] SQLite tables ready", flush=True)
 
-    # Load dataset from mounted CSV file
-    print(f"[{datetime.now()}] 📚 Loading Quran dataset...", flush=True)
+    # Load dataset
+    print(f"[{datetime.now()}] Loading Quran dataset...", flush=True)
     dataset_path = '/config/quran-dataset.csv'
     df_verses = pd.read_csv(dataset_path)
-    print(f"[{datetime.now()}] ✅ Loaded {len(df_verses)} verses from local file", flush=True)
+    print(f"[{datetime.now()}] Loaded {len(df_verses)} verses from local file", flush=True)
 
-    # Define collection name
-    collection_name = "quran_verses"
-    
-    # Initialize or connect to collection only if Milvus is available
-    if collection is not None:  # Check if we successfully connected to Milvus
-        print(f"[{datetime.now()}] Checking if collection exists...", flush=True)
+    # Check if quran vectors already exist (skip rebuild on restart)
+    quran_count = db.execute('SELECT COUNT(*) FROM quran_vec').fetchone()[0]
 
-        # Force drop and recreate for now to avoid hanging issues
-        try:
-            print(f"[{datetime.now()}] Step 1: Checking if collection exists for drop...", flush=True)
-            loop = asyncio.get_event_loop()
-            exists = await loop.run_in_executor(None, utility.has_collection, collection_name)
+    if quran_count == 0:
+        print(f"[{datetime.now()}] Building quran vector index from scratch...", flush=True)
 
-            if exists:
-                print(f"[{datetime.now()}] Step 2: Collection exists, calling drop_collection...", flush=True)
-                await loop.run_in_executor(None, utility.drop_collection, collection_name)
-                print(f"[{datetime.now()}] Step 3: drop_collection completed", flush=True)
-            else:
-                print(f"[{datetime.now()}] Step 2: Collection does not exist, skipping drop", flush=True)
-        except Exception as e:
-            print(f"[{datetime.now()}] Error in drop section: {e}", flush=True)
-            import traceback
-            print(traceback.format_exc())
-    else:
-        print(f"[{datetime.now()}] ⚠️ Skipping Milvus collection setup - running in limited mode", flush=True)
-
-    print(f"[{datetime.now()}] Step 4: Setting collection to None", flush=True)
-    collection = None  # Force recreation
-
-    # Only check and create collection if Milvus is connected
-    # Check if we have a connection by testing actual connectivity
-    milvus_connected = False
-    try:
-        # Test if connection is active by trying to list collections
-        if connections.has_connection("default"):
-            _ = utility.list_collections()
-            milvus_connected = True
-    except:
-        milvus_connected = False
-    
-    if milvus_connected:
-        print(f"[{datetime.now()}] Step 5: About to check has_collection for creation...", flush=True)
-        loop = asyncio.get_event_loop()
-        has_collection_result = await loop.run_in_executor(None, utility.has_collection, collection_name)
-        print(f"[{datetime.now()}] Step 6: has_collection returned {has_collection_result}", flush=True)
-    else:
-        has_collection_result = False
-        print(f"[{datetime.now()}] Step 5-6: Skipping has_collection check - no Milvus connection", flush=True)
-
-    if milvus_connected and (not has_collection_result or collection is None):
-        print(f"[{datetime.now()}] Step 7: Creating new Milvus collection with proper initialization...", flush=True)
-
-        # Define schema with 768-dimensional vectors for Arabic-BERT
-        fields = [
-            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-            FieldSchema(name="verse_id", dtype=DataType.INT64),
-            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=384),  # all-MiniLM-L6-v2 dimension
-            FieldSchema(name="surah", dtype=DataType.INT64),
-            FieldSchema(name="ayah", dtype=DataType.INT64),
-            FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=5000),  # Increased for longer verses
-            FieldSchema(name="translation", dtype=DataType.VARCHAR, max_length=5000)  # Increased for longer translations
-        ]
-        print(f"[{datetime.now()}] Step 9: Creating CollectionSchema...", flush=True)
-        schema = CollectionSchema(fields, "Quran verses with sentence embeddings")
-        print(f"[{datetime.now()}] Step 10: Schema created, now creating Collection...", flush=True)
-
-        # This is where it hangs - creating the Collection
-        # Run blocking operation in thread executor to prevent hanging async event loop
-        try:
-            loop = asyncio.get_event_loop()
-            collection = await loop.run_in_executor(None, Collection, collection_name, schema)
-            print(f"[{datetime.now()}] Step 11: Collection created successfully", flush=True)
-        except Exception as e:
-            print(f"[{datetime.now()}] ERROR creating collection: {e}", flush=True)
-            import traceback
-            print(traceback.format_exc())
-            raise
-
-        print(f"[{datetime.now()}] Step 12: Collection object created, continuing...", flush=True)
-
-        # Process and insert data BEFORE creating index
-        print(f"[{datetime.now()}] Step 13: Processing dataset for embedding generation...", flush=True)
+        # Prepare texts for embedding
         texts = []
         verse_ids = []
-
         for idx, row in df_verses.iterrows():
-            # Handle real dataset columns
             arabic_text = row.get('ayah_ar', row.get('text', ''))
             english_text = row.get('ayah_en', row.get('translation', ''))
-            surah_val = row.get('surah_no', row.get('surah', 0))
-            ayah_val = row.get('ayah_no_surah', row.get('ayah', 0))
-            
-            combined_text = f"{arabic_text} {english_text}" if pd.notna(english_text) else arabic_text
+            combined_text = f"{arabic_text} {english_text}" if pd.notna(english_text) else str(arabic_text)
             texts.append(combined_text)
             verse_ids.append(idx)
 
-        print(f"🤖 Generating {len(texts)} embeddings (384d)...", flush=True)
-        import time
-        import concurrent.futures
-        import threading
+        # Generate embeddings locally (much faster than HTTP calls)
+        print(f"[{datetime.now()}] Generating {len(texts)} embeddings (384d)...", flush=True)
+        embeddings = get_batch_embeddings(texts)
+        print(f"[{datetime.now()}] Generated {len(embeddings)} embeddings with shape {embeddings.shape}", flush=True)
 
-        embeddings = []
-        batch_size = 50  # Larger batch for concurrent processing
-        start_time = time.time()
+        # Insert into SQLite
+        print(f"[{datetime.now()}] Inserting verses into SQLite...", flush=True)
+        for i, idx in enumerate(verse_ids):
+            row = df_verses.iloc[idx]
+            surah = int(row.get('surah_no', row.get('surah', 1)))
+            ayah = int(row.get('ayah_no_surah', row.get('ayah', 1)))
+            text = str(row.get('ayah_ar', row.get('text', '')))[:5000]
+            translation = str(row.get('ayah_en', row.get('translation', '')))[:5000]
 
-        # Thread-safe counter for progress
-        processed_count = 0
-        lock = threading.Lock()
+            db.execute(
+                'INSERT OR REPLACE INTO quran_metadata (verse_id, surah, ayah, text, translation) VALUES (?, ?, ?, ?, ?)',
+                [i, surah, ayah, text, translation]
+            )
+            db.execute(
+                'INSERT INTO quran_vec (rowid, embedding) VALUES (?, ?)',
+                [i, serialize_f32(embeddings[i])]
+            )
 
-        def process_text_batch(text_batch, batch_index):
-            """Process a batch of texts concurrently"""
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                # Submit all embedding requests in parallel - maintain order!
-                futures = {executor.submit(get_embedding, text): i for i, text in enumerate(text_batch)}
+            if (i + 1) % 1000 == 0:
+                print(f"[{datetime.now()}]   Inserted {i + 1}/{len(verse_ids)} verses...", flush=True)
 
-                # Collect results in ORDER
-                batch_embeddings = [None] * len(text_batch)
-                for future in concurrent.futures.as_completed(futures):
-                    index = futures[future]
-                    embedding = future.result()
-                    # Validate dimension
-                    if len(embedding) != 384:
-                        print(f"⚠️ Embedding dimension mismatch: {len(embedding)}, fixing...")
-                        embedding = np.pad(embedding, (0, 384 - len(embedding))) if len(embedding) < 384 else embedding[:384]
-                    batch_embeddings[index] = embedding
-
-            # Update progress
-            nonlocal processed_count
-            with lock:
-                processed_count += len(text_batch)
-                if batch_index % 2 == 0:  # Update every 2 batches (~100 embeddings)
-                    elapsed = time.time() - start_time
-                    rate = processed_count / elapsed if elapsed > 0 else 0
-                    eta_seconds = (len(texts) - processed_count) / rate if rate > 0 else 0
-                    eta_minutes = eta_seconds / 60
-                    print(f"  [{datetime.now()}] Processed {processed_count}/{len(texts)} embeddings ({processed_count*100//len(texts)}%) - Rate: {rate:.1f}/s - ETA: {eta_minutes:.1f} min", flush=True)
-
-            return batch_embeddings
-
-        # Process all batches
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i+batch_size]
-            batch_embeddings = process_text_batch(batch_texts, i // batch_size)
-            embeddings.extend(batch_embeddings)
-
-        print(f"[{datetime.now()}] Converting embeddings to numpy array...", flush=True)
-        embeddings = np.array(embeddings)
-        print(f"[{datetime.now()}] ✅ Generated {len(embeddings)} embeddings with shape {embeddings.shape}", flush=True)
-
-        # Insert data in batches
-        print(f"[{datetime.now()}] 💾 Inserting verses into Milvus...", flush=True)
-        batch_size = 100
-        total_inserted = 0
-
-        for i in range(0, len(embeddings), batch_size):
-            print(f"[{datetime.now()}] Processing batch {i//batch_size + 1}/{(len(embeddings)-1)//batch_size + 1}...", flush=True)
-            batch_embeddings = embeddings[i:i+batch_size]
-            batch_verse_ids = verse_ids[i:i+batch_size]
-
-            # Prepare enhanced entity data
-            batch_surahs = []
-            batch_ayahs = []
-            batch_texts = []
-            batch_translations = []
-
-            for idx in batch_verse_ids:
-                row = df_verses.iloc[idx]
-                batch_surahs.append(int(row.get('surah_no', row.get('surah', 1))))
-                batch_ayahs.append(int(row.get('ayah_no_surah', row.get('ayah', 1))))
-                batch_texts.append(str(row.get('ayah_ar', row.get('text', '')))[:5000])
-                batch_translations.append(str(row.get('ayah_en', row.get('translation', '')))[:5000])
-
-            entities = [
-                batch_verse_ids,
-                batch_embeddings.tolist(),
-                batch_surahs,
-                batch_ayahs,
-                batch_texts,
-                batch_translations
-            ]
-
-            print(f"[{datetime.now()}] Inserting batch into Milvus...", flush=True)
-            collection.insert(entities)
-            total_inserted += len(batch_verse_ids)
-
-            if i % 1000 == 0:
-                print(f"[{datetime.now()}]   ✓ Inserted {total_inserted}/{len(embeddings)} verses...", flush=True)
-
-        print(f"[{datetime.now()}] Total inserted: {total_inserted} verses", flush=True)
-
-        # Flush to ensure data is persisted
-        print(f"[{datetime.now()}] Flushing collection to persist data...", flush=True)
-        try:
-            # Run blocking flush operation in executor to prevent hanging
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, collection.flush)
-            print(f"[{datetime.now()}] ✅ Successfully flushed {total_inserted} verses", flush=True)
-        except Exception as flush_error:
-            print(f"[{datetime.now()}] ⚠️ Flush error: {flush_error}", flush=True)
-            # Continue anyway - data might still be persisted
-
-        # Create index AFTER data insertion for better performance
-        print(f"[{datetime.now()}] 🔍 Creating HNSW index for fast similarity search...", flush=True)
-        try:
-            index_params = {
-                "index_type": "HNSW",
-                "metric_type": "COSINE",
-                "params": {
-                    "M": 16,              # Reduced for faster indexing
-                    "efConstruction": 128  # Reduced for faster indexing
-                }
-            }
-            await loop.run_in_executor(None, collection.create_index, "embedding", index_params)
-            print(f"[{datetime.now()}] ✅ HNSW index created successfully", flush=True)
-        except Exception as index_error:
-            print(f"[{datetime.now()}] ⚠️ Index creation error: {index_error}", flush=True)
-
-        # Load collection into memory
-        print(f"[{datetime.now()}] 📈 Loading collection into memory...", flush=True)
-        try:
-            await loop.run_in_executor(None, collection.load)
-            num_entities = collection.num_entities
-            print(f"[{datetime.now()}] ✅ Collection loaded with {num_entities} verses", flush=True)
-        except Exception as load_error:
-            print(f"[{datetime.now()}] ⚠️ Load error: {load_error}", flush=True)
-
-        print(f"[{datetime.now()}] Collection initialization complete, continuing...", flush=True)
+        db.commit()
+        quran_count = len(verse_ids)
+        print(f"[{datetime.now()}] Quran vector index built with {quran_count} verses", flush=True)
     else:
-        # Existing collection - ensure it's loaded
-        try:
-            print("📊 Loading existing collection into memory...")
-            collection.load()
-            print(f"✅ Collection loaded with {collection.num_entities} verses")
-        except Exception as load_error:
-            print(f"❌ Failed to load collection: {load_error}")
-            print("🔧 Dropping and recreating collection...")
-            try:
-                collection.release()
-            except:
-                pass
-            utility.drop_collection(collection_name)
-            # Force recreation by restarting
-            import sys
-            print("🔄 Restarting to rebuild collection...")
-            sys.exit(1)
+        print(f"[{datetime.now()}] Quran vectors already indexed ({quran_count} vectors), skipping rebuild", flush=True)
 
-    print(f"[{datetime.now()}] 🎯 Milvus vector database fully initialized and ready!", flush=True)
+    collection = True  # Flag: quran vectors ready
+    print(f"[{datetime.now()}] Quran vector database ready!", flush=True)
 
     # Initialize advanced analytics
     try:
-        print(f"[{datetime.now()}] 🧠 Initializing advanced analytics...", flush=True)
+        print(f"[{datetime.now()}] Initializing advanced analytics...", flush=True)
 
         # Generate embeddings for clustering (use subset for performance)
         sample_size = min(1000, len(df_verses))
@@ -627,167 +455,127 @@ async def startup_event():
         verse_embeddings = get_batch_embeddings(combined_texts)
 
         # Generate theme clusters
-        print(f"[{datetime.now()}] 🎨 Generating thematic clusters...", flush=True)
+        print(f"[{datetime.now()}] Generating thematic clusters...", flush=True)
         cluster_model, theme_labels = generate_theme_clusters(verse_embeddings, n_clusters=15)
-        print(f"[{datetime.now()}] ✨ Advanced AI analytics ready!", flush=True)
+        print(f"[{datetime.now()}] Advanced AI analytics ready!", flush=True)
 
         # Initialize Hadith collection
-        print(f"[{datetime.now()}] 📚 Initializing Hadith Database...", flush=True)
-        global hadith_collection, df_hadith
+        print(f"[{datetime.now()}] Initializing Hadith Database...", flush=True)
 
-        try:
-            # Download Hadith datasets
-            print(f"[{datetime.now()}] 📥 Downloading Hadith collections...", flush=True)
-            import urllib.request
-            import socket
+        hadith_count = db.execute('SELECT COUNT(*) FROM hadith_vec').fetchone()[0]
 
-            # Set timeout for downloads
-            socket.setdefaulttimeout(30)
+        if hadith_count == 0:
+            try:
+                # Download Hadith datasets
+                print(f"[{datetime.now()}] Downloading Hadith collections...", flush=True)
+                import urllib.request
+                import socket
+                socket.setdefaulttimeout(30)
 
-            # Download Sahih Bukhari
-            bukhari_url = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari.json"
-            muslim_url = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-muslim.json"
+                bukhari_url = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari.json"
+                muslim_url = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-muslim.json"
 
-            print(f"[{datetime.now()}] Downloading Bukhari...", flush=True)
-            with urllib.request.urlopen(bukhari_url) as response:
-                bukhari_data = json.loads(response.read())
-            print(f"[{datetime.now()}] ✅ Downloaded {len(bukhari_data['hadiths'])} Bukhari hadiths", flush=True)
+                print(f"[{datetime.now()}] Downloading Bukhari...", flush=True)
+                with urllib.request.urlopen(bukhari_url) as response:
+                    bukhari_data = json.loads(response.read())
+                print(f"[{datetime.now()}] Downloaded {len(bukhari_data['hadiths'])} Bukhari hadiths", flush=True)
 
-            print(f"[{datetime.now()}] Downloading Muslim...", flush=True)
-            with urllib.request.urlopen(muslim_url) as response:
-                muslim_data = json.loads(response.read())
-            print(f"[{datetime.now()}] ✅ Downloaded {len(muslim_data['hadiths'])} Muslim hadiths", flush=True)
+                print(f"[{datetime.now()}] Downloading Muslim...", flush=True)
+                with urllib.request.urlopen(muslim_url) as response:
+                    muslim_data = json.loads(response.read())
+                print(f"[{datetime.now()}] Downloaded {len(muslim_data['hadiths'])} Muslim hadiths", flush=True)
 
-            # Create Hadith dataframe
-            hadith_records = []
+                # Build hadith records
+                hadith_records = []
+                for hadith in bukhari_data['hadiths']:
+                    text = hadith.get('text', '')
+                    if len(text) > 9900:
+                        text = text[:9897] + "..."
+                    hadith_records.append({
+                        'collection': 'Sahih Bukhari',
+                        'hadith_number': str(hadith.get('hadithNumber', '')),
+                        'text': text,
+                        'reference': f"Bukhari {hadith.get('hadithNumber', '')}"
+                    })
 
-            for hadith in bukhari_data['hadiths']:
-                text = hadith.get('text', '')
-                # Truncate text if too long for Milvus VARCHAR field
-                if len(text) > 9900:
-                    text = text[:9897] + "..."
-                hadith_records.append({
-                    'collection': 'Sahih Bukhari',
-                    'hadith_number': hadith.get('hadithNumber', ''),
-                    'text': text,
-                    'arabic': hadith.get('arab', ''),
-                    'reference': f"Bukhari {hadith.get('hadithNumber', '')}"
-                })
+                for hadith in muslim_data['hadiths']:
+                    text = hadith.get('text', '')
+                    if len(text) > 9900:
+                        text = text[:9897] + "..."
+                    hadith_records.append({
+                        'collection': 'Sahih Muslim',
+                        'hadith_number': str(hadith.get('hadithNumber', '')),
+                        'text': text,
+                        'reference': f"Muslim {hadith.get('hadithNumber', '')}"
+                    })
 
-            for hadith in muslim_data['hadiths']:
-                text = hadith.get('text', '')
-                # Truncate text if too long for Milvus VARCHAR field
-                if len(text) > 9900:
-                    text = text[:9897] + "..."
-                hadith_records.append({
-                    'collection': 'Sahih Muslim',
-                    'hadith_number': hadith.get('hadithNumber', ''),
-                    'text': text,
-                    'arabic': hadith.get('arab', ''),
-                    'reference': f"Muslim {hadith.get('hadithNumber', '')}"
-                })
+                df_hadith = pd.DataFrame(hadith_records)
+                print(f"Loaded {len(df_hadith)} hadiths total", flush=True)
 
-            df_hadith = pd.DataFrame(hadith_records)
-            print(f"✅ Loaded {len(df_hadith)} hadiths total")
-
-            # Create Hadith collection in Milvus
-            hadith_collection_name = "hadith_collection"
-
-            if utility.has_collection(hadith_collection_name):
-                print(f"♻️ Hadith collection exists, dropping and recreating with new schema...")
-                utility.drop_collection(hadith_collection_name)
-
-            if not utility.has_collection(hadith_collection_name):
-                print("🔨 Creating new Hadith collection...")
-
-                # Define schema for Hadith collection
-                fields = [
-                    FieldSchema(name="hadith_id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-                    FieldSchema(name="collection", dtype=DataType.VARCHAR, max_length=100),
-                    FieldSchema(name="hadith_number", dtype=DataType.VARCHAR, max_length=50),
-                    FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=10000),  # Increased from 5000
-                    FieldSchema(name="reference", dtype=DataType.VARCHAR, max_length=100),
-                    FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=384)
-                ]
-
-                schema = CollectionSchema(fields, "Hadith embeddings for semantic search")
-                hadith_collection = Collection(hadith_collection_name, schema)
-
-                # Create HNSW index
-                index_params = {
-                    "metric_type": "COSINE",
-                    "index_type": "HNSW",
-                    "params": {"M": 16, "efConstruction": 256}
-                }
-                hadith_collection.create_index("embedding", index_params)
-
-                # Generate embeddings and insert
-                print("🧠 Generating Hadith embeddings...")
-                # Handle empty or None texts
+                # Generate embeddings and insert in batches
+                print("Generating Hadith embeddings...", flush=True)
                 hadith_texts = [
                     str(text) if text and str(text).strip() else "[No text available]"
                     for text in df_hadith['text'].tolist()
                 ]
-                batch_size = 100
 
+                batch_size = 500
                 for i in range(0, len(hadith_texts), batch_size):
                     try:
                         batch_texts = hadith_texts[i:i+batch_size]
                         batch_embeddings = get_batch_embeddings(batch_texts)
-
-                        # Ensure text fields don't exceed max length
                         batch_df = df_hadith.iloc[i:i+len(batch_texts)]
-                        texts = []
-                        for text in batch_df['text'].tolist():
-                            # Handle None or empty texts
-                            if not text or not str(text).strip():
-                                texts.append("[No text available]")
-                            elif len(str(text)) > 9900:
-                                texts.append(str(text)[:9897] + "...")
-                            else:
-                                texts.append(str(text))
 
-                        # Convert hadith_number to string if it's not already
-                        hadith_numbers = [str(num) for num in batch_df['hadith_number'].tolist()]
+                        for j in range(len(batch_texts)):
+                            row = batch_df.iloc[j]
+                            text = str(row['text']) if row['text'] and str(row['text']).strip() else "[No text available]"
 
-                        entities = [
-                            batch_df['collection'].tolist(),
-                            hadith_numbers,
-                            texts,
-                            batch_df['reference'].tolist(),
-                            batch_embeddings.tolist()
-                        ]
+                            db.execute(
+                                'INSERT INTO hadith_metadata (collection_name, hadith_number, text, reference) VALUES (?, ?, ?, ?)',
+                                [row['collection'], str(row['hadith_number']), text, row['reference']]
+                            )
+                            hadith_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                            db.execute(
+                                'INSERT INTO hadith_vec (rowid, embedding) VALUES (?, ?)',
+                                [hadith_id, serialize_f32(batch_embeddings[j])]
+                            )
 
-                        hadith_collection.insert(entities)
-
-                        if (i + batch_size) % 1000 == 0:
-                            print(f"  Indexed {i + batch_size}/{len(hadith_texts)} hadiths...")
+                        if (i + batch_size) % 2000 == 0:
+                            print(f"  Indexed {min(i + batch_size, len(hadith_texts))}/{len(hadith_texts)} hadiths...", flush=True)
                     except Exception as batch_error:
-                        print(f"  ⚠️ Error inserting batch {i//batch_size}: {batch_error}")
+                        print(f"  Error inserting hadith batch {i//batch_size}: {batch_error}", flush=True)
                         continue
 
-                hadith_collection.flush()
-                hadith_collection.load()
-                print(f"✅ Hadith collection ready with {hadith_collection.num_entities} hadiths")
+                db.commit()
+                hadith_count = db.execute('SELECT COUNT(*) FROM hadith_vec').fetchone()[0]
+                print(f"Hadith collection ready with {hadith_count} hadiths", flush=True)
 
-            print("📚 Hadith database initialization complete!")
+            except Exception as e:
+                print(f"Hadith initialization failed: {e}", flush=True)
+                import traceback
+                print(traceback.format_exc())
+                hadith_collection = None
+                df_hadith = None
+        else:
+            print(f"[{datetime.now()}] Hadith vectors already indexed ({hadith_count} vectors), skipping rebuild", flush=True)
+            df_hadith = True  # Sentinel: hadiths are available
 
-        except Exception as e:
-            print(f"⚠️ Hadith initialization failed: {e}")
-            hadith_collection = None
-            df_hadith = None
+        hadith_collection = True
+        print("Hadith database initialization complete!", flush=True)
 
     except Exception as e:
-        print(f"⚠️ Advanced analytics initialization failed: {e}")
+        print(f"Advanced analytics/hadith initialization failed: {e}", flush=True)
+        import traceback
+        print(traceback.format_exc())
         verse_embeddings = None
         cluster_model = None
         theme_labels = None
 
-    print(f"[{datetime.now()}] ✅✅✅ STARTUP COMPLETE - API READY!", flush=True)
+    print(f"[{datetime.now()}] STARTUP COMPLETE - API READY!", flush=True)
 
 @app.get("/")
 async def root():
-    return {"message": "🕌 Quran Search API - Mobile Optimized", "status": "ready", "verses": len(df_verses) if df_verses is not None else 0}
+    return {"message": "Quran Search API - Mobile Optimized", "status": "ready", "verses": len(df_verses) if df_verses is not None else 0}
 
 @app.get("/api")
 async def api_root():
@@ -795,39 +583,16 @@ async def api_root():
 
 @app.post("/api/hadith/search")
 async def search_hadith(query: SearchQuery):
-    global model, hadith_collection, df_hadith
+    global model, hadith_collection
 
-    if not hadith_collection or not model or df_hadith is None:
+    if not hadith_collection or not model:
         raise HTTPException(status_code=400, detail="Hadith system not ready")
 
     try:
-        # Generate query embedding
-        query_embedding = np.array([get_embedding(query.query)])
+        query_embedding = get_embedding(query.query)
+        results = search_hadith_vec(query_embedding, query.limit)
 
-        # Search parameters
-        search_params = {"metric_type": "COSINE", "params": {"ef": 128}}
-
-        # Search in Hadith collection
-        results = hadith_collection.search(
-            data=query_embedding,
-            anns_field="embedding",
-            param=search_params,
-            limit=query.limit,
-            output_fields=["collection", "hadith_number", "text", "reference"]
-        )
-
-        # Format results
-        search_results = []
-        for hits in results:
-            for hit in hits:
-                if hit.score > query.similarity_threshold:
-                    search_results.append({
-                        "collection": hit.entity.get('collection'),
-                        "hadith_number": hit.entity.get('hadith_number'),
-                        "text": hit.entity.get('text'),
-                        "reference": hit.entity.get('reference'),
-                        "score": float(hit.score)
-                    })
+        search_results = [r for r in results if r['score'] > query.similarity_threshold]
 
         return {
             "results": search_results,
@@ -856,7 +621,6 @@ async def search_verses(query: SearchQuery):
             }
 
         # Check if query is a verse reference (e.g., "2:255" or "2 255")
-        import re
         verse_pattern = re.match(r'^(\d+)[:\s]+(\d+)$', query.query.strip())
         if verse_pattern:
             surah_num = int(verse_pattern.group(1))
@@ -870,10 +634,7 @@ async def search_verses(query: SearchQuery):
                                  (df_verses[ayah_col] == ayah_num)]
 
             if not verse_row.empty:
-                # Handle both dataset formats
                 try:
-                    # Get verse data
-
                     result = {
                         "surah": int(verse_row.iloc[0]['surah_no']),
                         "ayah": int(verse_row.iloc[0]['ayah_no_surah']),
@@ -886,24 +647,8 @@ async def search_verses(query: SearchQuery):
                         "results": [result],
                         "total": 1
                     }
-                except KeyError as ke:
-                    # KeyError accessing column
+                except KeyError:
                     raise
-        # Check collection status and reload if needed
-        try:
-            num_entities = collection.num_entities
-            if num_entities == 0:
-                raise Exception("Collection is empty, needs reindexing")
-        except Exception as status_error:
-            print(f"⚠️ Collection status check failed: {status_error}, attempting to reload...")
-            try:
-                collection.load()
-            except:
-                # Collection might be corrupted, recreate
-                print("🔧 Collection corrupted, forcing recreation...")
-                from pymilvus import utility
-                utility.drop_collection("quran_verses")
-                raise HTTPException(status_code=503, detail="Collection being rebuilt, please retry in a moment")
 
         # Check if query contains Arabic
         has_arabic = any('\u0600' <= c <= '\u06FF' for c in query.query)
@@ -928,67 +673,21 @@ async def search_verses(query: SearchQuery):
                         if len(keyword_results) >= query.limit:
                             break
 
-        # Generate query embedding
-        # Use embedding for search queries
-        query_embedding = [get_hybrid_embedding(query.query, target_dim=384)]
+        # Semantic vector search
+        query_embedding = get_hybrid_embedding(query.query, target_dim=384)
+        search_results = search_quran_vec(query_embedding, query.limit * 2)
 
-        # Search in Milvus with retry logic
-        search_params = {"metric_type": "COSINE", "params": {"ef": 128}}  # Higher ef for better recall
-
-        results = None
-        for attempt in range(3):
-            try:
-                results = collection.search(
-                    query_embedding,
-                    "embedding",
-                    search_params,
-                    limit=query.limit * 2,
-                    output_fields=["surah", "ayah", "text", "translation"]
-                )
-                break  # Success, exit retry loop
-            except Exception as search_error:
-                if "fail to search on QueryNode" in str(search_error):
-                    print(f"⚠️ QueryNode error on attempt {attempt + 1}, retrying...")
-                    # Try to reload collection
-                    try:
-                        collection.release()
-                        collection.load()
-                    except:
-                        pass
-                    if attempt == 2:  # Last attempt failed
-                        raise HTTPException(status_code=503, detail="Search service temporarily unavailable, please retry")
-                else:
-                    raise
-
-        if not results:
-            raise HTTPException(status_code=500, detail="Search failed after retries")
-
-        # Process results
-        search_results = []
-        for hits in results:
-            for hit in hits:
-                if hit.score >= query.similarity_threshold:
-                    # Use data directly from Milvus fields
-                    surah = int(hit.entity.get('surah', 1))
-                    ayah = int(hit.entity.get('ayah', 1))
-
-                    if query.surah_filter and surah != query.surah_filter:
-                        continue
-
-                    result = {
-                        "surah": surah,
-                        "ayah": ayah,
-                        "text": hit.entity.get('text', ''),
-                        "translation": hit.entity.get('translation', ''),
-                        "score": float(hit.score)
-                    }
-                    search_results.append(result)
+        # Filter by threshold and surah
+        filtered = []
+        for r in search_results:
+            if r['score'] >= query.similarity_threshold:
+                if query.surah_filter and r['surah'] != query.surah_filter:
+                    continue
+                filtered.append(r)
 
         # Combine keyword results with search results
         if keyword_results:
-            # Add keyword results first (they have higher relevance)
-            all_results = keyword_results + search_results
-            # Remove duplicates based on surah and ayah
+            all_results = keyword_results + filtered
             seen = set()
             unique_results = []
             for result in all_results:
@@ -996,16 +695,15 @@ async def search_verses(query: SearchQuery):
                 if key not in seen:
                     seen.add(key)
                     unique_results.append(result)
-            search_results = unique_results
+            filtered = unique_results
 
-        search_results = sorted(search_results, key=lambda x: x['score'], reverse=True)[:query.limit]
-        return {"results": search_results, "total": len(search_results)}
+        filtered = sorted(filtered, key=lambda x: x['score'], reverse=True)[:query.limit]
+        return {"results": filtered, "total": len(filtered)}
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
         logger.error(f"Search error: {e}")
-        # Check if it's a dimension mismatch error
         if "expected" in str(e) and "actual" in str(e):
             raise HTTPException(status_code=503, detail="Collection needs reindexing due to dimension change, please wait")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
@@ -1018,43 +716,28 @@ async def advanced_search(query: SearchQuery):
         raise HTTPException(status_code=400, detail="System not ready")
 
     try:
-        # Use embedding for search queries
-        query_embedding = [get_hybrid_embedding(query.query, target_dim=384)]
-        search_params = {"metric_type": "COSINE", "params": {"nprobe": 32}}
-
-        results = collection.search(
-            query_embedding,
-            "embedding",
-            search_params,
-            limit=query.limit * 3,
-            output_fields=["surah", "ayah", "text", "translation"]
-        )
+        query_embedding = get_hybrid_embedding(query.query, target_dim=384)
+        search_results_raw = search_quran_vec(query_embedding, query.limit * 3)
 
         search_results = []
         confidence_scores = []
 
-        for hits in results:
-            for hit in hits:
-                if hit.score >= query.similarity_threshold:
-                    # Use data directly from Milvus fields
-                    surah = int(hit.entity.get('surah', 1))
-                    ayah = int(hit.entity.get('ayah', 1))
+        for r in search_results_raw:
+            if r['score'] >= query.similarity_threshold:
+                if query.surah_filter and r['surah'] != query.surah_filter:
+                    continue
 
-                    if query.surah_filter and surah != query.surah_filter:
-                        continue
-
-                    # Enhanced result with confidence analysis
-                    result = {
-                        "surah": surah,
-                        "ayah": ayah,
-                        "text": hit.entity.get('text', ''),
-                        "translation": hit.entity.get('translation', ''),
-                        "score": float(hit.score),
-                        "confidence": "high" if hit.score > 0.8 else "medium" if hit.score > 0.6 else "low",
-                        "relevance_percentage": round(hit.score * 100, 1)
-                    }
-                    search_results.append(result)
-                    confidence_scores.append(hit.score)
+                result = {
+                    "surah": r['surah'],
+                    "ayah": r['ayah'],
+                    "text": r['text'],
+                    "translation": r['translation'],
+                    "score": r['score'],
+                    "confidence": "high" if r['score'] > 0.8 else "medium" if r['score'] > 0.6 else "low",
+                    "relevance_percentage": round(r['score'] * 100, 1)
+                }
+                search_results.append(result)
+                confidence_scores.append(r['score'])
 
         # Sort and limit results
         search_results = sorted(search_results, key=lambda x: x['score'], reverse=True)[:query.limit]
@@ -1096,17 +779,8 @@ async def multi_vector_search(query: dict):
         keyword_weight = query.get("keyword_weight", 0.3)
 
         # Semantic search
-        query_embedding = np.array([get_embedding(query_text)])
-        # Optimized search parameters for HNSW
-        search_params = {"metric_type": "COSINE", "params": {"ef": 128}}  # Higher ef for better recall
-
-        semantic_results = collection.search(
-            query_embedding,
-            "embedding",
-            search_params,
-            limit=limit * 2,
-            output_fields=["surah", "ayah", "text", "translation"]
-        )
+        query_embedding = get_embedding(query_text)
+        semantic_results = search_quran_vec(query_embedding, limit * 2)
 
         # Keyword search
         keyword_matches = []
@@ -1129,20 +803,13 @@ async def multi_vector_search(query: dict):
         combined_results = {}
 
         # Add semantic results
-        for hits in semantic_results:
-            for hit in hits:
-                # Create unique key for this verse
-                verse_key = f"{hit.entity.get('surah', 1)}:{hit.entity.get('ayah', 1)}"
-                combined_results[verse_key] = {
-                    "semantic_score": hit.score,
-                    "keyword_score": 0,
-                    "verse": {
-                        "surah": hit.entity.get('surah', 1),
-                        "ayah": hit.entity.get('ayah', 1),
-                        "text": hit.entity.get('text', ''),
-                        "translation": hit.entity.get('translation', '')
-                    }
-                }
+        for r in semantic_results:
+            verse_key = f"{r['surah']}:{r['ayah']}"
+            combined_results[verse_key] = {
+                "semantic_score": r['score'],
+                "keyword_score": 0,
+                "verse": r
+            }
 
         # Add keyword results
         for match in keyword_matches:
@@ -1156,8 +823,8 @@ async def multi_vector_search(query: dict):
                     "semantic_score": 0,
                     "keyword_score": match["score"],
                     "verse": {
-                        "surah": verse.get('surah_no', verse.get('surah', 1)),
-                        "ayah": verse.get('ayah_no_surah', verse.get('ayah', 1)),
+                        "surah": int(verse.get('surah_no', verse.get('surah', 1))),
+                        "ayah": int(verse.get('ayah_no_surah', verse.get('ayah', 1))),
                         "text": verse.get('ayah_ar', verse.get('text', '')),
                         "translation": verse.get('ayah_en', verse.get('translation', ''))
                     }
@@ -1192,7 +859,7 @@ async def multi_vector_search(query: dict):
                 "total_combined": len(combined_results)
             },
             "performance": {
-                "semantic_matches": len([hits for hits in semantic_results for hit in hits]),
+                "semantic_matches": len(semantic_results),
                 "keyword_matches": len(keyword_matches),
                 "final_results": len(final_results)
             }
@@ -1261,68 +928,22 @@ async def islamic_qa(query: QAQuery):
         raise HTTPException(status_code=400, detail="System not ready")
 
     try:
-        # Check collection status
-        try:
-            num_entities = collection.num_entities
-            if num_entities == 0:
-                raise HTTPException(status_code=503, detail="Collection is empty, rebuilding in progress")
-        except Exception as status_error:
-            print(f"⚠️ Collection status check failed for QA: {status_error}")
-            try:
-                collection.load()
-            except:
-                raise HTTPException(status_code=503, detail="Vector database temporarily unavailable")
-
-        # Use embedding for question understanding
-        query_embedding = [get_hybrid_embedding(query.question, target_dim=384)]
-
-        # Search with retry logic
-        search_params = {"metric_type": "COSINE", "params": {"ef": 128}}
-
-        results = None
-        for attempt in range(3):
-            try:
-                results = collection.search(
-                    query_embedding,
-                    "embedding",
-                    search_params,
-                    limit=query.context_limit,
-                    output_fields=["surah", "ayah", "text", "translation"]
-                )
-                break
-            except Exception as search_error:
-                if "fail to search on QueryNode" in str(search_error) or "work" in str(search_error):
-                    print(f"⚠️ QueryNode error in QA on attempt {attempt + 1}, retrying...")
-                    try:
-                        collection.release()
-                        collection.load()
-                    except:
-                        pass
-                    if attempt == 2:
-                        raise HTTPException(status_code=503, detail="Search service temporarily unavailable")
-                else:
-                    raise
-
-        if not results:
-            raise HTTPException(status_code=500, detail="QA search failed after retries")
+        query_embedding = get_hybrid_embedding(query.question, target_dim=384)
+        results = search_quran_vec(query_embedding, query.context_limit)
 
         relevant_verses = []
         total_relevance = 0
 
-        for hits in results:
-            for hit in hits:
-                # Use data directly from Milvus fields
-                relevance_score = float(hit.score)
-                total_relevance += relevance_score
-
-                relevant_verses.append({
-                    "surah": int(hit.entity.get('surah', 1)),
-                    "ayah": int(hit.entity.get('ayah', 1)),
-                    "text": hit.entity.get('text', ''),
-                    "translation": hit.entity.get('translation', ''),
-                    "relevance": relevance_score,
-                    "confidence": "high" if relevance_score > 0.7 else "medium" if relevance_score > 0.5 else "low"
-                })
+        for r in results:
+            total_relevance += r['score']
+            relevant_verses.append({
+                "surah": r['surah'],
+                "ayah": r['ayah'],
+                "text": r['text'],
+                "translation": r['translation'],
+                "relevance": r['score'],
+                "confidence": "high" if r['score'] > 0.7 else "medium" if r['score'] > 0.5 else "low"
+            })
 
         # Enhanced answer generation
         question_type = "guidance" if any(word in query.question.lower() for word in ["how", "should", "guide"]) else "definition" if any(word in query.question.lower() for word in ["what", "who", "define"]) else "general"
@@ -1370,8 +991,8 @@ async def analyze_arabic_text(text_data: dict):
         word_count = len(words)
 
         # Basic morphological patterns
-        definite_articles = len([w for w in words if w.startswith('\u0627\u0644')])  # الـ
-        conjunctions = len([w for w in words if w.startswith('\u0648')])  # و
+        definite_articles = len([w for w in words if w.startswith('\u0627\u0644')])  # al-
+        conjunctions = len([w for w in words if w.startswith('\u0648')])  # wa
 
         # Linguistic features
         features = {
@@ -1465,15 +1086,17 @@ async def word_frequency_analytics():
 
 @app.get("/api/stats")
 async def get_stats():
-    global df_verses, collection, df_hadith, hadith_collection
+    global df_verses, collection, hadith_collection, db
 
     try:
+        quran_count = db.execute('SELECT COUNT(*) FROM quran_vec').fetchone()[0] if db else 0
+        hadith_count = db.execute('SELECT COUNT(*) FROM hadith_vec').fetchone()[0] if db else 0
         stats = {
             "total_verses": len(df_verses) if df_verses is not None else 0,
             "status": "Ready" if collection and df_verses is not None else "Loading",
-            "indexed_verses": collection.num_entities if collection else 0,
-            "total_hadiths": len(df_hadith) if df_hadith is not None else 0,
-            "indexed_hadiths": hadith_collection.num_entities if hadith_collection else 0
+            "indexed_verses": quran_count,
+            "total_hadiths": hadith_count,
+            "indexed_hadiths": hadith_count
         }
         return stats
     except Exception as e:
@@ -1651,12 +1274,10 @@ async def generate_wordcloud():
         ).generate(all_text)
 
         # Convert to base64 for web display
-        import io
         img_buffer = io.BytesIO()
         wordcloud.to_image().save(img_buffer, format='PNG')
         img_buffer.seek(0)
 
-        import base64
         img_str = base64.b64encode(img_buffer.read()).decode()
 
         return {
@@ -1680,35 +1301,23 @@ async def export_search_results(query: dict):
         limit = query.get("limit", 50)
 
         # Perform search
-        query_embedding = np.array([get_embedding(search_query)])
-        # Optimized search parameters for HNSW
-        search_params = {"metric_type": "COSINE", "params": {"ef": 128}}  # Higher ef for better recall
-
-        results = collection.search(
-            query_embedding,
-            "embedding",
-            search_params,
-            limit=limit,
-            output_fields=["surah", "ayah", "text", "translation"]
-        )
+        query_embedding = get_embedding(search_query)
+        results = search_quran_vec(query_embedding, limit)
 
         # Process results
         export_data = []
-        for hits in results:
-            for hit in hits:
-                # Use data directly from Milvus fields
-                export_data.append({
-                    "surah": int(hit.entity.get('surah', 1)),
-                    "ayah": int(hit.entity.get('ayah', 1)),
-                    "arabic_text": hit.entity.get('text', ''),
-                    "english_translation": hit.entity.get('translation', ''),
-                    "similarity_score": float(hit.score),
-                    "search_query": search_query
-                })
+        for r in results:
+            export_data.append({
+                "surah": r['surah'],
+                "ayah": r['ayah'],
+                "arabic_text": r['text'],
+                "english_translation": r['translation'],
+                "similarity_score": r['score'],
+                "search_query": search_query
+            })
 
         if export_format == "csv":
             # Convert to CSV format
-            import io
             import csv
 
             output = io.StringIO()
@@ -1729,8 +1338,8 @@ async def export_search_results(query: dict):
         else:
             return {
                 "format": "json",
-                "data": export_data,  # Changed from 'content' to 'data' for API consistency
-                "content": export_data,  # Keep 'content' for backward compatibility
+                "data": export_data,
+                "content": export_data,
                 "filename": f"quran_search_{search_query[:20]}.json",
                 "count": len(export_data)
             }
@@ -1753,7 +1362,6 @@ async def get_verse(request: Dict[str, Any]):
         raise HTTPException(status_code=400, detail="Reference required")
 
     # Parse reference (e.g., "2:255" or "2 255")
-    import re
     match = re.match(r'^(\d+)[:\s]+(\d+)$', reference.strip())
     if not match:
         raise HTTPException(status_code=400, detail="Invalid reference format. Use 'surah:ayah' (e.g., '2:255')")
@@ -1819,7 +1427,6 @@ async def tafsir_endpoint(request: Dict[str, Any]):
     reference = request.get("reference")
     if reference:
         # Parse reference like "2:255"
-        import re
         match = re.match(r'^(\d+)[:\s]+(\d+)$', reference)
         if match:
             surah = int(match.group(1))
@@ -1973,7 +1580,7 @@ async def health_check():
 @app.get("/api/status")
 async def status_endpoint():
     """Status endpoint for health checks"""
-    global collection, df_verses
+    global collection, df_verses, db
 
     return {
         "status": "healthy",
@@ -1984,7 +1591,7 @@ async def status_endpoint():
         "collection_ready": collection is not None,
         "verses_loaded": df_verses is not None,
         "total_verses": len(df_verses) if df_verses is not None else 0,
-        "milvus_connected": connections.has_connection("default"),
+        "sqlite_connected": db is not None,
         "available_endpoints": [
             "/api/search", "/api/qa", "/api/similar", "/api/tafsir",
             "/api/count", "/api/analytics/themes", "/api/export"
