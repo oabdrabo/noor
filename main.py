@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-from fastapi import FastAPI, HTTPException, UploadFile, File, Response
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 import pandas as pd
 import numpy as np
@@ -11,44 +10,37 @@ import io
 import base64
 import struct
 import sqlite3
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 import logging
 from datetime import datetime
 import re
 from collections import Counter
 import torch
 
-# Advanced AI/ML imports
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import uvicorn
 import umap
 import networkx as nx
-import plotly.graph_objects as go
-import plotly.express as px
 from wordcloud import WordCloud
 import arabic_reshaper
 from bidi.algorithm import get_display
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Advanced Quran AI Search & Analytics API",
-    version="2.0.0",
-    description="AI-powered Quranic search with semantic analysis, clustering, visualization, and advanced insights"
+    title="Noor - Islamic Knowledge Search API",
+    version="3.0.0",
+    description="AI-powered Quran and Hadith search with semantic analysis and clustering"
 )
 
 # Enable CORS
 base_domain = os.environ.get("BASE_DOMAIN", "jsr.bz")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[f"https://{base_domain}", f"https://quran.{base_domain}"],
+    allow_origins=[f"https://{base_domain}", f"https://noor.{base_domain}"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
@@ -73,7 +65,7 @@ def prepare_arabic_text(text):
     try:
         reshaped_text = arabic_reshaper.reshape(text)
         return get_display(reshaped_text)
-    except:
+    except Exception:
         return text
 
 def generate_theme_clusters(embeddings, n_clusters=20):
@@ -116,7 +108,7 @@ def analyze_themes(df, cluster_labels):
                 'size': len(cluster_verses),
                 'sample_verses': cluster_verses.head(3)[['surah_no', 'ayah_no_surah', 'ayah_en']].to_dict('records')
             }
-        except:
+        except Exception:
             theme_analysis[int(cluster_id)] = {
                 'keywords': ['mixed_theme'],
                 'size': len(cluster_verses),
@@ -300,7 +292,7 @@ def get_hybrid_embedding(text, target_dim=384):
 async def startup_event():
     global model, arabic_model, arabic_tokenizer, collection, db, df_verses, verse_embeddings, cluster_model, theme_labels, hadith_collection, df_hadith
 
-    print("Starting Quran AI Search & Analytics API...", flush=True)
+    print("Starting Noor - Islamic Knowledge Search API...", flush=True)
     print(f"[{datetime.now()}] Starting startup_event function", flush=True)
 
     # Set model cache directory to PVC for persistence
@@ -469,8 +461,6 @@ async def startup_event():
                 # Download Hadith datasets
                 print(f"[{datetime.now()}] Downloading Hadith collections...", flush=True)
                 import urllib.request
-                import socket
-                socket.setdefaulttimeout(30)
 
                 bukhari_url = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari.json"
                 muslim_url = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-muslim.json"
@@ -575,11 +565,11 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    return {"message": "Quran Search API - Mobile Optimized", "status": "ready", "verses": len(df_verses) if df_verses is not None else 0}
+    return {"message": "Noor API", "status": "ready", "verses": len(df_verses) if df_verses is not None else 0}
 
 @app.get("/api")
 async def api_root():
-    return {"message": "Quran Search API", "version": "1.0", "endpoints": ["/api/search", "/api/hadith/search", "/api/qa", "/api/count", "/api/similar", "/api/tafsir", "/api/export", "/api/analytics/themes"]}
+    return {"message": "Noor API", "version": "3.0", "endpoints": ["/api/search", "/api/hadith/search", "/api/qa", "/api/count", "/api/similar", "/api/tafsir", "/api/export", "/api/analytics/themes"]}
 
 @app.post("/api/hadith/search")
 async def search_hadith(query: SearchQuery):
@@ -647,8 +637,9 @@ async def search_verses(query: SearchQuery):
                         "results": [result],
                         "total": 1
                     }
-                except KeyError:
-                    raise
+                except KeyError as e:
+                    logger.error(f"Column not found: {e}")
+                    raise HTTPException(status_code=500, detail=f"Dataset column error: {e}")
 
         # Check if query contains Arabic
         has_arabic = any('\u0600' <= c <= '\u06FF' for c in query.query)
@@ -701,11 +692,9 @@ async def search_verses(query: SearchQuery):
         return {"results": filtered, "total": len(filtered)}
 
     except HTTPException:
-        raise  # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error(f"Search error: {e}")
-        if "expected" in str(e) and "actual" in str(e):
-            raise HTTPException(status_code=503, detail="Collection needs reindexing due to dimension change, please wait")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @app.post("/api/search/advanced")
@@ -870,35 +859,30 @@ async def multi_vector_search(query: dict):
         raise HTTPException(status_code=500, detail=f"Multi-vector search failed: {str(e)}")
 
 @app.post("/api/count")
-async def count_word_occurrences(request: Dict[str, Any]):
+async def count_word_occurrences(request: CountQuery):
     global df_verses
 
     if df_verses is None:
         raise HTTPException(status_code=400, detail="Dataset not loaded")
 
     try:
-        # Support both 'word' and 'query' parameters
-        word = request.get("word", request.get("query", "")).strip()
+        word = request.word.strip()
         if not word:
-            raise HTTPException(status_code=400, detail="Word/query cannot be empty")
+            raise HTTPException(status_code=400, detail="Word cannot be empty")
 
         count = 0
         examples = []
+        flags = 0 if request.case_sensitive else re.IGNORECASE
+        pattern = re.compile(re.escape(word), flags)
 
         for _, verse in df_verses.iterrows():
-            # Handle both dataset formats
             text = verse.get('ayah_ar', verse.get('text', ''))
             translation = verse.get('ayah_en', verse.get('translation', ''))
             text = text if pd.notna(text) else ""
             translation = translation if pd.notna(translation) else ""
             combined_text = f"{text} {translation}"
 
-            case_sensitive = request.get("case_sensitive", False)
-            if case_sensitive:
-                matches = len(re.findall(re.escape(word), combined_text))
-            else:
-                matches = len(re.findall(re.escape(word), combined_text, re.IGNORECASE))
-
+            matches = len(pattern.findall(combined_text))
             if matches > 0:
                 count += matches
                 examples.append({
@@ -911,10 +895,8 @@ async def count_word_occurrences(request: Dict[str, Any]):
         return {
             "word": word,
             "count": count,
-            "examples": examples[:10],  # Limit examples for mobile
-            "total_verses_with_word": len(examples),
-            "verses": examples[:10],  # Add 'verses' field for API compatibility
-            "occurrences": examples[:10]  # Add 'occurrences' field for compatibility
+            "examples": examples[:10],
+            "total_verses_with_word": len(examples)
         }
 
     except Exception as e:
@@ -971,8 +953,6 @@ async def islamic_qa(query: QAQuery):
         raise
     except Exception as e:
         logger.error(f"Islamic QA error: {e}")
-        if "expected" in str(e) and "actual" in str(e):
-            raise HTTPException(status_code=503, detail="Collection reindexing needed, please wait")
         raise HTTPException(status_code=500, detail=f"QA failed: {str(e)}")
 
 @app.post("/api/arabic/analyze")
@@ -1100,7 +1080,7 @@ async def get_stats():
         }
         return stats
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/surah/{surah_no}")
 async def get_surah_info(surah_no: int):
@@ -1170,7 +1150,7 @@ async def get_theme_clusters():
     global df_verses, verse_embeddings, cluster_model, theme_labels
 
     if df_verses is None or verse_embeddings is None:
-        return {"error": "Analytics data not available. Dataset needs to be processed."}
+        raise HTTPException(status_code=503, detail="Analytics data not available")
 
     try:
         # Generate theme analysis
@@ -1183,7 +1163,7 @@ async def get_theme_clusters():
             "sample_size": len(verse_embeddings)
         }
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/analytics/embeddings/visualization")
 async def get_embeddings_visualization():
@@ -1191,10 +1171,9 @@ async def get_embeddings_visualization():
     global verse_embeddings, theme_labels
 
     if verse_embeddings is None:
-        return {"error": "Embeddings not available"}
+        raise HTTPException(status_code=503, detail="Embeddings not available")
 
     try:
-        # Generate UMAP projection
         umap_model = umap.UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1)
         embedding_2d = umap_model.fit_transform(verse_embeddings)
 
@@ -1208,7 +1187,7 @@ async def get_embeddings_visualization():
 
         return viz_data
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/analytics/similarity/network")
 async def create_similarity_network(threshold: float = 0.8):
@@ -1216,10 +1195,9 @@ async def create_similarity_network(threshold: float = 0.8):
     global verse_embeddings, df_verses
 
     if verse_embeddings is None:
-        return {"error": "Embeddings not available"}
+        raise HTTPException(status_code=503, detail="Embeddings not available")
 
     try:
-        # Create verse network
         G = create_verse_network(verse_embeddings, threshold=threshold)
 
         # Extract network data
@@ -1251,7 +1229,7 @@ async def create_similarity_network(threshold: float = 0.8):
             }
         }
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/analytics/wordcloud")
 async def generate_wordcloud():
@@ -1259,10 +1237,9 @@ async def generate_wordcloud():
     global df_verses
 
     if df_verses is None:
-        return {"error": "Dataset not available"}
+        raise HTTPException(status_code=503, detail="Dataset not available")
 
     try:
-        # Combine all English text
         all_text = " ".join(df_verses['ayah_en'].fillna('').tolist())
 
         # Generate word cloud
@@ -1285,7 +1262,7 @@ async def generate_wordcloud():
             "word_frequencies": dict(wordcloud.words_)
         }
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/analytics/export")
 async def export_search_results(query: dict):
@@ -1293,7 +1270,7 @@ async def export_search_results(query: dict):
     global model, collection, df_verses
 
     if not collection or not model or df_verses is None:
-        return {"error": "System not ready"}
+        raise HTTPException(status_code=503, detail="System not ready")
 
     try:
         search_query = query.get("query", "")
@@ -1332,20 +1309,19 @@ async def export_search_results(query: dict):
             return {
                 "format": "csv",
                 "content": csv_content,
-                "filename": f"quran_search_{search_query[:20]}.csv",
+                "filename": f"noor_search_{re.sub(r'[^a-zA-Z0-9]', '_', search_query[:20])}.csv",
                 "count": len(export_data)
             }
         else:
             return {
                 "format": "json",
                 "data": export_data,
-                "content": export_data,
-                "filename": f"quran_search_{search_query[:20]}.json",
+                "filename": f"noor_search_{re.sub(r'[^a-zA-Z0-9]', '_', search_query[:20])}.json",
                 "count": len(export_data)
             }
 
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============ ADDITIONAL ENDPOINTS FOR MISSING FEATURES ============
 
@@ -1453,19 +1429,22 @@ async def tafsir_endpoint(request: Dict[str, Any]):
     verse_text = verse_row.iloc[0]['ayah_ar']
     verse_trans = verse_row.iloc[0].get('ayah_en', '')
 
-    # Enhanced tafsir response
-    interpretation = f"This verse from Surah {surah}, Ayah {ayah} discusses important themes of faith, guidance, and righteousness. The verse emphasizes the importance of belief in Allah and following the righteous path. [Detailed tafsir would be loaded from database]"
+    # Find semantically similar verses for context
+    query_embedding = get_embedding(verse_trans if verse_trans else verse_text)
+    similar = search_quran_vec(query_embedding, 5)
+    related_verses = [
+        {"reference": f"{r['surah']}:{r['ayah']}", "translation": r['translation'], "score": r['score']}
+        for r in similar if not (r['surah'] == surah and r['ayah'] == ayah)
+    ][:3]
 
     return {
         "reference": f"{surah}:{ayah}",
         "surah": surah,
         "ayah": ayah,
         "verse": verse_text,
-        "verse_text": verse_text,  # Add for compatibility
         "translation": verse_trans,
-        "interpretation": interpretation,  # Add expected field
-        "tafsir": interpretation,
-        "source": "Ibn Kathir"
+        "related_verses": related_verses,
+        "note": "Tafsir data not yet available. Showing semantically related verses instead."
     }
 
 @app.get("/api/search/surah/{surah_no}")
@@ -1566,35 +1545,19 @@ async def theme_distribution():
     }
 
 @app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
-    global collection, df_verses
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "collection_ready": collection is not None,
-        "verses_loaded": df_verses is not None,
-        "total_verses": len(df_verses) if df_verses is not None else 0
-    }
-
 @app.get("/api/status")
-async def status_endpoint():
-    """Status endpoint for health checks"""
+async def health_status():
+    """Health/status endpoint"""
     global collection, df_verses, db
-
     return {
         "status": "healthy",
-        "endpoints": [
-            "/api/search", "/api/qa", "/api/similar", "/api/tafsir",
-            "/api/count", "/api/analytics/themes", "/api/export", "/api/hadith/search"
-        ],
         "collection_ready": collection is not None,
         "verses_loaded": df_verses is not None,
         "total_verses": len(df_verses) if df_verses is not None else 0,
         "sqlite_connected": db is not None,
-        "available_endpoints": [
+        "endpoints": [
             "/api/search", "/api/qa", "/api/similar", "/api/tafsir",
-            "/api/count", "/api/analytics/themes", "/api/export"
+            "/api/count", "/api/analytics/themes", "/api/export", "/api/hadith/search"
         ]
     }
 
