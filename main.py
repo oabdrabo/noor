@@ -251,23 +251,8 @@ async def lifespan(app: FastAPI):
     db.execute("PRAGMA temp_store = MEMORY")
     db.execute("PRAGMA mmap_size = 268435456")
 
-    # Model version tracking — rebuild vectors if model changes
-    CURRENT_MODEL = 'intfloat/multilingual-e5-small'
+    # Create tables first (needed before model version check)
     db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
-    stored_model = db.execute("SELECT value FROM meta WHERE key='model'").fetchone()
-    need_rebuild = (stored_model is None) or (stored_model[0] != CURRENT_MODEL)
-    if need_rebuild:
-        old = stored_model[0] if stored_model else 'unknown'
-        print(f"[{datetime.now()}] Model changed ({old} -> {CURRENT_MODEL}), rebuilding vectors...", flush=True)
-        db.execute('DROP TABLE IF EXISTS quran_vec')
-        db.execute('DROP TABLE IF EXISTS hadith_vec')
-        db.execute('DROP TABLE IF EXISTS quran_metadata')
-        db.execute('DROP TABLE IF EXISTS hadith_metadata')
-        db.commit()
-    db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('model', ?)", [CURRENT_MODEL])
-    db.commit()
-
-    # Create tables
     db.execute('''CREATE TABLE IF NOT EXISTS quran_metadata (
         verse_id INTEGER PRIMARY KEY, surah INTEGER, ayah INTEGER,
         text TEXT, translation TEXT
@@ -284,6 +269,21 @@ async def lifespan(app: FastAPI):
     )''')
     db.commit()
     print(f"[{datetime.now()}] SQLite tables ready", flush=True)
+
+    # Model version tracking — wipe data if model changes
+    CURRENT_MODEL = 'intfloat/multilingual-e5-small'
+    stored_model = db.execute("SELECT value FROM meta WHERE key='model'").fetchone()
+    need_rebuild = (stored_model is None) or (stored_model[0] != CURRENT_MODEL)
+    if need_rebuild:
+        old = stored_model[0] if stored_model else 'unknown'
+        print(f"[{datetime.now()}] Model changed ({old} -> {CURRENT_MODEL}), rebuilding vectors...", flush=True)
+        db.execute('DELETE FROM quran_vec')
+        db.execute('DELETE FROM hadith_vec')
+        db.execute('DELETE FROM quran_metadata')
+        db.execute('DELETE FROM hadith_metadata')
+        db.commit()
+    db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('model', ?)", [CURRENT_MODEL])
+    db.commit()
 
     # Load dataset
     print(f"[{datetime.now()}] Loading Quran dataset...", flush=True)
