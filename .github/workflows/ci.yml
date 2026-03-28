@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  repository-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect repository
+        run: |
+          git status --short
+          find . -maxdepth 2 -type f | sort | sed -n '1,80p'
+      - name: Check documentation
+        run: |
+          test -f README.md
+          test -f docs/project-overview.md
+          test -f docs/operations.md
