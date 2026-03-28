@@ -157,7 +157,7 @@ def get_batch_embeddings(model, texts: list) -> np.ndarray:
     print(f"[{datetime.now()}] Generating embeddings for {len(texts)} texts...", flush=True)
     try:
         clean = [str(t).strip()[:5000] if t and str(t).strip() else "" for t in texts]
-        embeddings = model.encode(clean, show_progress_bar=True, batch_size=64)
+        embeddings = model.encode(clean, show_progress_bar=True, batch_size=32)
         print(f"[{datetime.now()}] Completed generating {len(embeddings)} embeddings", flush=True)
         return np.array(embeddings, dtype=np.float32)
     except Exception as e:
