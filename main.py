@@ -21,15 +21,33 @@ from datetime import datetime
 import re
 from collections import Counter
 from functools import lru_cache
-
-from sklearn.cluster import KMeans
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import umap
-import networkx as nx
-from wordcloud import WordCloud
 import arabic_reshaper
 from bidi.algorithm import get_display
+
+# Heavy libs lazy-loaded on first use (saves ~300MB at startup)
+def _kmeans():
+    from sklearn.cluster import KMeans
+    return KMeans
+
+def _tfidf():
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    return TfidfVectorizer
+
+def _cosine_similarity():
+    from sklearn.metrics.pairwise import cosine_similarity
+    return cosine_similarity
+
+def _umap():
+    import umap
+    return umap
+
+def _networkx():
+    import networkx as nx
+    return nx
+
+def _wordcloud():
+    from wordcloud import WordCloud
+    return WordCloud
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -140,13 +158,21 @@ def search_hadith_vec(db, query_embedding, limit):
 
 # --------------- embedding ---------------
 
+_embedding_cache = {}
+
 def get_embedding(model, text: str) -> np.ndarray:
-    """Get embedding for a single text using the multilingual model."""
+    """Get embedding for a single text using the multilingual model. LRU cached."""
     if not text or not str(text).strip():
         return np.zeros(1024, dtype=np.float32)
+    text_str = str(text).strip()[:5000]
+    if text_str in _embedding_cache:
+        return _embedding_cache[text_str]
     try:
-        text_str = str(text).strip()[:5000]
-        return np.array(model.encode(text_str), dtype=np.float32)
+        result = np.array(model.encode(text_str), dtype=np.float32)
+        if len(_embedding_cache) >= 2000:
+            _embedding_cache.pop(next(iter(_embedding_cache)))
+        _embedding_cache[text_str] = result
+        return result
     except Exception as e:
         logger.error(f"Embedding error: {e}")
         return np.zeros(1024, dtype=np.float32)
@@ -171,6 +197,7 @@ def generate_theme_clusters(embeddings, n_clusters=15):
     """Generate thematic clusters from embeddings."""
     print(f"[{datetime.now()}] Running KMeans clustering ({n_clusters} clusters)...", flush=True)
     try:
+        KMeans = _kmeans()
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
         labels = kmeans.fit_predict(embeddings)
         print(f"[{datetime.now()}] Clustering complete", flush=True)
@@ -182,6 +209,7 @@ def generate_theme_clusters(embeddings, n_clusters=15):
 
 def analyze_themes(df, cluster_labels):
     """Analyze and label thematic clusters using TF-IDF."""
+    TfidfVectorizer = _tfidf()
     theme_analysis = {}
     for cid in np.unique(cluster_labels):
         cluster_verses = df[cluster_labels == cid]
@@ -230,12 +258,11 @@ async def lifespan(app: FastAPI):
     os.environ.setdefault('HF_HOME', '/config/models/huggingface')
     os.environ.setdefault('TRANSFORMERS_CACHE', '/config/models/huggingface')
 
-    # Load BGE-M3: best multilingual model (Arabic+English), 1024d
-    print(f"[{datetime.now()}] Loading BAAI/bge-m3 model...", flush=True)
+    # Load BGE-M3: best multilingual model (Arabic+English), 1024d, ONNX backend for 2-3x faster CPU inference
+    print(f"[{datetime.now()}] Loading BAAI/bge-m3 model (ONNX backend)...", flush=True)
     from sentence_transformers import SentenceTransformer
-    import torch
-    model = SentenceTransformer('BAAI/bge-m3', model_kwargs={'torch_dtype': torch.float16})
-    print(f"[{datetime.now()}] Model loaded (bge-m3, 1024d, float16)", flush=True)
+    model = SentenceTransformer('BAAI/bge-m3', backend='onnx')
+    print(f"[{datetime.now()}] Model loaded (bge-m3, 1024d, ONNX)", flush=True)
 
     # Initialize SQLite with sqlite-vec
     print(f"[{datetime.now()}] Initializing SQLite vector database...", flush=True)
@@ -287,6 +314,9 @@ async def lifespan(app: FastAPI):
     db.commit()
     print(f"[{datetime.now()}] SQLite tables ready", flush=True)
 
+    # Indexes for faster metadata lookups
+    db.execute('CREATE INDEX IF NOT EXISTS idx_quran_surah ON quran_metadata(surah, ayah)')
+    db.execute('CREATE INDEX IF NOT EXISTS idx_hadith_collection ON hadith_metadata(collection_name)')
     db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('model', ?)", [CURRENT_MODEL])
     db.commit()
 
@@ -299,48 +329,33 @@ async def lifespan(app: FastAPI):
     quran_count = db.execute('SELECT COUNT(*) FROM quran_vec').fetchone()[0]
     if quran_count == 0:
         print(f"[{datetime.now()}] Building quran vector index...", flush=True)
-        texts, verse_ids = [], []
-        for idx, row in df_verses.iterrows():
-            ar = row.get('ayah_ar', row.get('text', ''))
-            en = row.get('ayah_en', row.get('translation', ''))
-            texts.append(f"{ar} {en}" if pd.notna(en) else str(ar))
-            verse_ids.append(idx)
+        ar_col = _col(df_verses, 'ayah_ar', 'text')
+        en_col = _col(df_verses, 'ayah_en', 'translation')
+        texts = (df_verses[ar_col].fillna('').astype(str) + ' ' + df_verses[en_col].fillna('').astype(str)).tolist()
 
         embeddings = get_batch_embeddings(model, texts)
-        print(f"[{datetime.now()}] Inserting {len(verse_ids)} verses...", flush=True)
-        for i, idx in enumerate(verse_ids):
-            row = df_verses.iloc[idx]
-            surah = int(row.get('surah_no', row.get('surah', 1)))
-            ayah = int(row.get('ayah_no_surah', row.get('ayah', 1)))
-            text = str(row.get('ayah_ar', row.get('text', '')))[:5000]
-            translation = str(row.get('ayah_en', row.get('translation', '')))[:5000]
-            db.execute('INSERT OR REPLACE INTO quran_metadata (verse_id, surah, ayah, text, translation) VALUES (?, ?, ?, ?, ?)',
-                       [i, surah, ayah, text, translation])
-            db.execute('INSERT INTO quran_vec (rowid, embedding) VALUES (?, ?)',
-                       [i, serialize_f32(embeddings[i])])
-            if (i + 1) % 1000 == 0:
-                print(f"[{datetime.now()}]   Inserted {i + 1}/{len(verse_ids)} verses...", flush=True)
+        print(f"[{datetime.now()}] Batch inserting {len(texts)} verses...", flush=True)
+
+        sc_col = _col(df_verses, 'surah_no', 'surah')
+        ac_col = _col(df_verses, 'ayah_no_surah', 'ayah')
+        meta_rows = [(i, int(r[sc_col]), int(r[ac_col]),
+                       str(r.get(ar_col, ''))[:5000], str(r.get(en_col, ''))[:5000])
+                      for i, (_, r) in enumerate(df_verses.iterrows())]
+        vec_rows = [(i, serialize_f32(embeddings[i])) for i in range(len(texts))]
+
+        db.executemany('INSERT OR REPLACE INTO quran_metadata (verse_id, surah, ayah, text, translation) VALUES (?, ?, ?, ?, ?)', meta_rows)
+        db.executemany('INSERT INTO quran_vec (rowid, embedding) VALUES (?, ?)', vec_rows)
         db.commit()
-        print(f"[{datetime.now()}] Quran index built ({len(verse_ids)} verses)", flush=True)
+        print(f"[{datetime.now()}] Quran index built ({len(texts)} verses)", flush=True)
     else:
         print(f"[{datetime.now()}] Quran vectors cached ({quran_count}), skipping", flush=True)
 
     print(f"[{datetime.now()}] Quran vector database ready!", flush=True)
 
-    # Analytics: cluster a sample for theme analysis
+    # Analytics deferred to first request (saves 15-20s startup)
     verse_embeddings = None
     cluster_model = None
     theme_labels = None
-    try:
-        print(f"[{datetime.now()}] Initializing analytics...", flush=True)
-        sample_size = min(1000, len(df_verses))
-        sample_df = df_verses.sample(n=sample_size, random_state=42)
-        combined_texts = [f"{row['ayah_ar']} {row['ayah_en']}" for _, row in sample_df.iterrows()]
-        verse_embeddings = get_batch_embeddings(model, combined_texts)
-        cluster_model, theme_labels = generate_theme_clusters(verse_embeddings)
-        print(f"[{datetime.now()}] Analytics ready!", flush=True)
-    except Exception as e:
-        logger.error(f"Analytics init failed: {e}")
 
     # Index hadiths
     hadith_ready = False
@@ -376,18 +391,20 @@ async def lifespan(app: FastAPI):
 
             hadith_texts = [str(t).strip() if t and str(t).strip() else "[No text]" for t in df_hadith['text']]
             batch_size = 500
+            hid_counter = 1
             for i in range(0, len(hadith_texts), batch_size):
                 try:
                     batch = hadith_texts[i:i+batch_size]
                     batch_emb = get_batch_embeddings(model, batch)
                     batch_df = df_hadith.iloc[i:i+len(batch)]
-                    for j in range(len(batch)):
-                        row = batch_df.iloc[j]
-                        db.execute('INSERT INTO hadith_metadata (collection_name, hadith_number, text, reference) VALUES (?, ?, ?, ?)',
-                                   [row['collection'], str(row['hadith_number']), str(row['text']), row['reference']])
-                        hid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
-                        db.execute('INSERT INTO hadith_vec (rowid, embedding) VALUES (?, ?)',
-                                   [hid, serialize_f32(batch_emb[j])])
+                    meta_rows = [(r['collection'], str(r['hadith_number']), str(r['text']), r['reference'])
+                                  for _, r in batch_df.iterrows()]
+                    db.executemany('INSERT INTO hadith_metadata (collection_name, hadith_number, text, reference) VALUES (?, ?, ?, ?)', meta_rows)
+                    # Get the rowid range for vec inserts
+                    last_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+                    start_id = last_id - len(batch) + 1
+                    vec_rows = [(start_id + j, serialize_f32(batch_emb[j])) for j in range(len(batch))]
+                    db.executemany('INSERT INTO hadith_vec (rowid, embedding) VALUES (?, ?)', vec_rows)
                     if (i + batch_size) % 2000 == 0:
                         print(f"  Indexed {min(i + batch_size, len(hadith_texts))}/{len(hadith_texts)} hadiths...", flush=True)
                 except Exception as batch_err:
@@ -708,28 +725,29 @@ async def count_word_occurrences(query: CountQuery, request: Request):
         if not word:
             raise HTTPException(status_code=400, detail="Word cannot be empty")
 
-        flags = 0 if query.case_sensitive else re.IGNORECASE
-        pattern = re.compile(re.escape(word), flags)
-        count = 0
-        examples = []
-
         ar_col = _col(df, 'ayah_ar', 'text')
         en_col = _col(df, 'ayah_en', 'translation')
         sc_col = _col(df, 'surah_no', 'surah')
         ac_col = _col(df, 'ayah_no_surah', 'ayah')
 
-        for _, verse in df.iterrows():
-            text = verse.get(ar_col, '') if pd.notna(verse.get(ar_col, '')) else ""
-            trans = verse.get(en_col, '') if pd.notna(verse.get(en_col, '')) else ""
-            matches = len(pattern.findall(f"{text} {trans}"))
-            if matches > 0:
-                count += matches
-                examples.append({
-                    "surah": int(verse[sc_col]), "ayah": int(verse[ac_col]),
-                    "text": text[:100] + "..." if len(text) > 100 else text, "matches": matches
-                })
+        case = not query.case_sensitive
+        combined = df[ar_col].fillna('') + ' ' + df[en_col].fillna('')
+        match_counts = combined.str.count(re.escape(word), flags=re.IGNORECASE if case else 0)
+        mask = match_counts > 0
+        matched = df[mask]
+        counts = match_counts[mask]
 
-        return {"word": word, "count": count, "examples": examples[:10], "total_verses_with_word": len(examples)}
+        count = int(counts.sum())
+        examples = []
+        for idx in matched.index[:10]:
+            text = str(df.at[idx, ar_col]) if pd.notna(df.at[idx, ar_col]) else ""
+            examples.append({
+                "surah": int(df.at[idx, sc_col]), "ayah": int(df.at[idx, ac_col]),
+                "text": text[:100] + "..." if len(text) > 100 else text,
+                "matches": int(counts[idx])
+            })
+
+        return {"word": word, "count": count, "examples": examples, "total_verses_with_word": int(mask.sum())}
     except HTTPException:
         raise
     except Exception as e:
@@ -878,13 +896,26 @@ async def get_surah_verses(surah_no: int, request: Request):
 
 # ---- Advanced Analytics ----
 
+def _ensure_analytics(s):
+    """Lazy-compute analytics on first request."""
+    if s.verse_embeddings is None:
+        print(f"[{datetime.now()}] Computing analytics (deferred)...", flush=True)
+        sample_size = min(1000, len(s.df_verses))
+        sample_df = s.df_verses.sample(n=sample_size, random_state=42)
+        ar_col = _col(s.df_verses, 'ayah_ar', 'text')
+        en_col = _col(s.df_verses, 'ayah_en', 'translation')
+        combined_texts = (sample_df[ar_col].fillna('').astype(str) + ' ' + sample_df[en_col].fillna('').astype(str)).tolist()
+        s.verse_embeddings = get_batch_embeddings(s.model, combined_texts)
+        s.cluster_model, s.theme_labels = generate_theme_clusters(s.verse_embeddings)
+        print(f"[{datetime.now()}] Analytics ready!", flush=True)
+
 @app.get("/api/analytics/themes")
 async def get_theme_clusters(request: Request):
     s = request.app.state
-    if s.df_verses is None or s.verse_embeddings is None:
-        raise HTTPException(status_code=503, detail="Analytics not available")
+    if s.df_verses is None:
+        raise HTTPException(status_code=503, detail="Dataset not loaded")
+    _ensure_analytics(s)
 
-    # Cache themes
     if 'themes' not in s.cache:
         sample_df = s.df_verses.sample(n=min(1000, len(s.df_verses)), random_state=42)
         s.cache['themes'] = analyze_themes(sample_df, s.theme_labels)
@@ -899,9 +930,10 @@ async def get_embeddings_visualization(request: Request):
     if s.verse_embeddings is None:
         raise HTTPException(status_code=503, detail="Embeddings not available")
 
+    _ensure_analytics(s)
     # Cache UMAP projection
     if 'umap_2d' not in s.cache:
-        reducer = umap.UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1)
+        reducer = _umap().UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1)
         s.cache['umap_2d'] = reducer.fit_transform(s.verse_embeddings)
 
     return {
@@ -919,7 +951,9 @@ async def create_similarity_network(request: Request, threshold: float = 0.8):
     if not 0 <= threshold <= 1:
         raise HTTPException(status_code=400, detail="Threshold must be between 0 and 1")
 
-    sim = cosine_similarity(s.verse_embeddings)
+    _ensure_analytics(s)
+    nx = _networkx()
+    sim = _cosine_similarity()(s.verse_embeddings)
     G = nx.Graph()
     for i in range(len(s.verse_embeddings)):
         G.add_node(i)
@@ -944,7 +978,7 @@ async def generate_wordcloud_endpoint(request: Request):
     # Cache wordcloud
     if 'wordcloud' not in s.cache:
         all_text = " ".join(s.df_verses[_col(s.df_verses, 'ayah_en', 'translation')].fillna(''))
-        wc = WordCloud(width=800, height=400, background_color='white', colormap='viridis', max_words=100).generate(all_text)
+        wc = _wordcloud()(width=800, height=400, background_color='white', colormap='viridis', max_words=100).generate(all_text)
         buf = io.BytesIO()
         wc.to_image().save(buf, format='PNG')
         buf.seek(0)
