@@ -258,11 +258,11 @@ async def lifespan(app: FastAPI):
     os.environ.setdefault('HF_HOME', '/config/models/huggingface')
     os.environ.setdefault('TRANSFORMERS_CACHE', '/config/models/huggingface')
 
-    # Load BGE-M3: best multilingual model (Arabic+English), 1024d, ONNX backend for 2-3x faster CPU inference
-    print(f"[{datetime.now()}] Loading BAAI/bge-m3 model (ONNX backend)...", flush=True)
+    # Load BGE-M3: best multilingual model (Arabic+English), 1024d
+    print(f"[{datetime.now()}] Loading BAAI/bge-m3 model...", flush=True)
     from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer('BAAI/bge-m3', backend='onnx')
-    print(f"[{datetime.now()}] Model loaded (bge-m3, 1024d, ONNX)", flush=True)
+    model = SentenceTransformer('BAAI/bge-m3')
+    print(f"[{datetime.now()}] Model loaded (bge-m3, 1024d)", flush=True)
 
     # Initialize SQLite with sqlite-vec
     print(f"[{datetime.now()}] Initializing SQLite vector database...", flush=True)
