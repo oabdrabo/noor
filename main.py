@@ -164,7 +164,7 @@ def get_embedding(model, text: str) -> np.ndarray:
     """Get embedding for a single text using the multilingual model. LRU cached."""
     if not text or not str(text).strip():
         return np.zeros(1024, dtype=np.float32)
-    text_str = str(text).strip()[:5000]
+    text_str = str(text).strip()[:2000]
     if text_str in _embedding_cache:
         return _embedding_cache[text_str]
     try:
@@ -182,8 +182,8 @@ def get_batch_embeddings(model, texts: list) -> np.ndarray:
     """Get embeddings for multiple texts."""
     print(f"[{datetime.now()}] Generating embeddings for {len(texts)} texts...", flush=True)
     try:
-        clean = [str(t).strip()[:5000] if t and str(t).strip() else "" for t in texts]
-        embeddings = model.encode(clean, show_progress_bar=True, batch_size=32)
+        clean = [str(t).strip()[:2000] if t and str(t).strip() else "" for t in texts]
+        embeddings = model.encode(clean, show_progress_bar=True, batch_size=8)
         print(f"[{datetime.now()}] Completed generating {len(embeddings)} embeddings", flush=True)
         return np.array(embeddings, dtype=np.float32)
     except Exception as e:
