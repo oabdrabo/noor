@@ -527,14 +527,17 @@ createApp({
         switch(mode.value){
           case 'search':
             data=await post(`${API}/search`,{query:q,limit:20,surah_filter:sf})
+            if(data.indexing){error.value=`Building search index... (${data.progress||'please wait'})`;break}
             results.value=data.results||[]
             break
           case 'hadith':
             data=await post(`${API}/hadith/search`,{query:q,limit:20})
+            if(data.indexing){error.value=`Building hadith index... (${data.progress||'please wait'})`;break}
             results.value=data.results||[]
             break
           case 'qa':
             data=await post(`${API}/qa`,{question:q,context_limit:5})
+            if(data.indexing){error.value=`Building search index... (${data.progress||'please wait'})`;break}
             qaAnswer.value=data
             break
           case 'similar':
