@@ -38,9 +38,9 @@
 
     /* Header */
     header{text-align:center;padding:52px 0 20px;position:relative}
-    .logo{font-size:14px;letter-spacing:6px;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:4px}
-    .logo-ar{font-family:var(--font-ar);font-size:42px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:2px}
-    header p{color:var(--text3);font-size:12px;letter-spacing:.5px}
+    .logo{font-size:26px;font-weight:700;letter-spacing:-0.5px;color:var(--text)}
+    .logo span{color:var(--gold);font-family:var(--font-ar);font-weight:700;margin-left:6px;font-size:22px}
+    header p{color:var(--text3);font-size:12px;letter-spacing:.5px;margin-top:2px}
     .header-actions{position:absolute;top:20px;right:0;display:flex;gap:6px}
     .icon-btn{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);transition:all .2s var(--ease)}
     .icon-btn:hover{border-color:var(--gold-border);background:var(--surface2)}
@@ -214,8 +214,7 @@
 <div id="app">
   <div class="app">
     <header>
-      <div class="logo">NOOR</div>
-      <div class="logo-ar">&#1606;&#1615;&#1608;&#1585;</div>
+      <div class="logo">Noor <span>&#1606;&#1608;&#1585;</span></div>
       <p>Quran & Hadith Semantic Search</p>
       <div class="header-actions">
         <button class="icon-btn" @click="showBookmarks=!showBookmarks" :title="bookmarks.length+' bookmarks'">
