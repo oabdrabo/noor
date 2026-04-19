@@ -297,6 +297,8 @@ def _ensure_model_version(db, model_name):
     db.commit()
 
 
+_index_stop = None
+
 def _background_index(app):
     """Build vector indexes incrementally in background thread.
 
@@ -304,8 +306,14 @@ def _background_index(app):
     so progress survives crashes and restarts resume where they left off.
     """
     import threading
+    global _index_stop
+    _index_stop = threading.Event()
     s = app.state
     BATCH = 64
+    stop = _index_stop
+
+    def _stopped():
+        return stop.is_set()
 
     def _run():
         try:
@@ -329,6 +337,9 @@ def _background_index(app):
                     print(f"[{datetime.now()}] Building quran vector index ({total} verses)...", flush=True)
 
                 for i in range(existing, total, BATCH):
+                    if _stopped():
+                        print(f"[{datetime.now()}] Indexing stopped (shutdown)", flush=True)
+                        return
                     batch_texts = texts[i:i + BATCH]
                     batch_emb = s.model.encode(batch_texts, batch_size=32)
                     meta_rows = []
@@ -350,6 +361,9 @@ def _background_index(app):
                 s.quran_ready = True
                 print(f"[{datetime.now()}] Quran index complete ({total} verses)", flush=True)
 
+            if _stopped():
+                return
+
             # --- Hadith vectors ---
             hadith_count = s.db.execute('SELECT COUNT(*) FROM hadith_vec').fetchone()[0]
             if hadith_count > 0:
@@ -363,6 +377,8 @@ def _background_index(app):
                     ("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari.json", "Sahih Bukhari"),
                     ("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-muslim.json", "Sahih Muslim"),
                 ]:
+                    if _stopped():
+                        return
                     with urllib.request.urlopen(url, timeout=30) as resp:
                         data = json.loads(resp.read())
                     print(f"[{datetime.now()}] {name}: {len(data['hadiths'])} hadiths", flush=True)
@@ -381,6 +397,9 @@ def _background_index(app):
                                 for t in df_hadith['text']]
 
                 for i in range(0, total_h, BATCH):
+                    if _stopped():
+                        print(f"[{datetime.now()}] Hadith indexing stopped (shutdown)", flush=True)
+                        return
                     batch = hadith_texts[i:i + BATCH]
                     batch_emb = s.model.encode(batch, batch_size=32)
                     batch_df = df_hadith.iloc[i:i + len(batch)]
@@ -403,14 +422,19 @@ def _background_index(app):
 
             s.index_progress = "Ready"
             print(f"[{datetime.now()}] INDEXING COMPLETE - ALL READY!", flush=True)
+        except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+            # DB closed during shutdown — expected, exit silently
+            pass
         except Exception as e:
-            logger.error(f"Background indexing error: {e}")
-            import traceback
-            traceback.print_exc()
-            s.index_progress = f"Error: {e}"
+            if not _stopped():
+                logger.error(f"Background indexing error: {e}")
+                import traceback
+                traceback.print_exc()
+                s.index_progress = f"Error: {e}"
 
     t = threading.Thread(target=_run, daemon=True)
     t.start()
+    return t
 
 
 @asynccontextmanager
@@ -451,12 +475,17 @@ async def lifespan(app: FastAPI):
     app.state.cache = {}
 
     # Start background indexing (incremental, crash-resilient)
-    _background_index(app)
+    index_thread = _background_index(app)
 
     print(f"[{datetime.now()}] API STARTED - indexing in background", flush=True)
 
     yield
 
+    # Signal background thread to stop, wait for it, then close DB
+    if _index_stop:
+        _index_stop.set()
+    if index_thread:
+        index_thread.join(timeout=5)
     db.close()
     print("Noor shutdown complete.", flush=True)
 
