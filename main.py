@@ -20,9 +20,6 @@ import logging
 from datetime import datetime
 import re
 from collections import Counter
-from functools import lru_cache
-import arabic_reshaper
-from bidi.algorithm import get_display
 
 # Heavy libs lazy-loaded on first use (saves ~300MB at startup)
 def _kmeans():
@@ -76,14 +73,6 @@ def normalize_arabic(text: str) -> str:
     for old, new in replacements.items():
         text = text.replace(old, new)
     return text
-
-
-def prepare_arabic_text(text: str) -> str:
-    """Reshape Arabic text for display."""
-    try:
-        return get_display(arabic_reshaper.reshape(text))
-    except Exception:
-        return text
 
 
 def _col(df, *names):
@@ -213,19 +202,22 @@ def generate_theme_clusters(embeddings, n_clusters=15):
 def analyze_themes(df, cluster_labels):
     """Analyze and label thematic clusters using TF-IDF."""
     TfidfVectorizer = _tfidf()
+    en_col = _col(df, 'ayah_en', 'translation')
+    sc_col = _col(df, 'surah_no', 'surah')
+    ac_col = _col(df, 'ayah_no_surah', 'ayah')
     theme_analysis = {}
     for cid in np.unique(cluster_labels):
         cluster_verses = df[cluster_labels == cid]
         vectorizer = TfidfVectorizer(max_features=10, stop_words='english')
         try:
-            vectorizer.fit_transform(cluster_verses['ayah_en'].fillna(''))
+            vectorizer.fit_transform(cluster_verses[en_col].fillna(''))
             keywords = list(vectorizer.get_feature_names_out()[:5])
         except Exception:
             keywords = ['mixed_theme']
         theme_analysis[int(cid)] = {
             'keywords': keywords,
             'size': len(cluster_verses),
-            'sample_verses': cluster_verses.head(3)[['surah_no', 'ayah_no_surah', 'ayah_en']].to_dict('records')
+            'sample_verses': cluster_verses.head(3)[[sc_col, ac_col, en_col]].to_dict('records')
         }
     return theme_analysis
 
@@ -235,7 +227,6 @@ def analyze_themes(df, cluster_labels):
 class SearchQuery(BaseModel):
     query: str
     limit: int = 10
-    language: str = "both"
     surah_filter: Optional[int] = None
     similarity_threshold: float = 0.3
 
@@ -510,7 +501,8 @@ app.add_middleware(
 @app.get("/")
 async def root(request: Request):
     df = request.app.state.df_verses
-    return {"message": "Noor API", "status": "ready", "verses": len(df) if df is not None else 0}
+    ready = getattr(request.app.state, 'quran_ready', False)
+    return {"message": "Noor API", "status": "ready" if ready else "indexing", "verses": len(df) if df is not None else 0}
 
 @app.get("/api")
 async def api_root():
@@ -910,16 +902,22 @@ async def get_juz_info(juz_no: int, request: Request):
     if juz_no < 1 or juz_no > 30:
         raise HTTPException(status_code=400, detail="Invalid juz number (1-30)")
 
-    jv = df[df['juz_no'] == juz_no]
+    jc = _col(df, 'juz_no')
+    sc = _col(df, 'surah_no', 'surah')
+    ac = _col(df, 'ayah_no_surah', 'ayah')
+    ar_col = _col(df, 'ayah_ar', 'text')
+    en_col = _col(df, 'ayah_en', 'translation')
+
+    jv = df[df[jc] == juz_no]
     if jv.empty:
         raise HTTPException(status_code=404, detail=f"Juz {juz_no} not found")
 
     return {
         "juz_no": juz_no, "total_verses": len(jv),
-        "verses": [{"reference": f"{int(r['surah_no'])}:{int(r['ayah_no_surah'])}",
-                     "arabic": r.get('ayah_ar', ''), "translation": r.get('ayah_en', '')}
+        "verses": [{"reference": f"{int(r[sc])}:{int(r[ac])}",
+                     "arabic": r.get(ar_col, ''), "translation": r.get(en_col, '')}
                     for _, r in jv.head(10).iterrows()],
-        "surahs_included": sorted(jv['surah_no'].unique().tolist())
+        "surahs_included": sorted(jv[sc].unique().tolist())
     }
 
 
@@ -976,8 +974,8 @@ async def get_theme_clusters(request: Request):
 @app.get("/api/analytics/embeddings/visualization")
 async def get_embeddings_visualization(request: Request):
     s = request.app.state
-    if s.verse_embeddings is None:
-        raise HTTPException(status_code=503, detail="Embeddings not available")
+    if s.df_verses is None:
+        raise HTTPException(status_code=503, detail="Dataset not loaded")
 
     _ensure_analytics(s)
     # Cache UMAP projection
@@ -995,8 +993,8 @@ async def get_embeddings_visualization(request: Request):
 @app.post("/api/analytics/similarity/network")
 async def create_similarity_network(request: Request, threshold: float = 0.8):
     s = request.app.state
-    if s.verse_embeddings is None:
-        raise HTTPException(status_code=503, detail="Embeddings not available")
+    if s.df_verses is None:
+        raise HTTPException(status_code=503, detail="Dataset not loaded")
     if not 0 <= threshold <= 1:
         raise HTTPException(status_code=400, detail="Threshold must be between 0 and 1")
 
@@ -1114,6 +1112,9 @@ async def similar_verses(req: Dict[str, Any], request: Request):
 @app.post("/api/tafsir")
 async def tafsir_endpoint(req: Dict[str, Any], request: Request):
     s = request.app.state
+    if not getattr(s, 'quran_ready', False):
+        return {"related_verses": [], "indexing": True,
+                "progress": getattr(s, 'index_progress', 'Starting...')}
     reference = req.get("reference")
     if reference:
         m = re.match(r'^(\d+)[:\s]+(\d+)$', reference)
