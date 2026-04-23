@@ -153,7 +153,7 @@ EMBED_DIM = 384
 _embedding_cache = {}
 
 def get_embedding(model, text: str) -> np.ndarray:
-    """Get embedding for a single text using the multilingual model. LRU cached."""
+    """Get embedding for a single text, cached in-memory (max 2000 entries)."""
     if not text or not str(text).strip():
         return np.zeros(EMBED_DIM, dtype=np.float32)
     text_str = str(text).strip()[:2000]
@@ -508,7 +508,8 @@ async def root(request: Request):
 async def api_root():
     return {"endpoints": [
         "/api/search", "/api/hadith/search", "/api/qa", "/api/count",
-        "/api/similar", "/api/tafsir", "/api/export", "/api/analytics/themes"
+        "/api/similar", "/api/tafsir", "/api/export",
+        "/api/analytics/themes", "/api/analytics/distribution"
     ]}
 
 @app.get("/api/health")
@@ -890,34 +891,6 @@ async def get_surah_info(surah_no: int, request: Request):
         "surah_no": surah_no,
         "name_en": first.get('surah_name_en', f'Surah {surah_no}'),
         "total_verses": len(sv),
-        "juz_no": int(first.get('juz_no', 0)) if pd.notna(first.get('juz_no')) else None
-    }
-
-
-@app.get("/api/juz/{juz_no}")
-async def get_juz_info(juz_no: int, request: Request):
-    df = request.app.state.df_verses
-    if df is None:
-        raise HTTPException(status_code=503, detail="Dataset not loaded")
-    if juz_no < 1 or juz_no > 30:
-        raise HTTPException(status_code=400, detail="Invalid juz number (1-30)")
-
-    jc = _col(df, 'juz_no')
-    sc = _col(df, 'surah_no', 'surah')
-    ac = _col(df, 'ayah_no_surah', 'ayah')
-    ar_col = _col(df, 'ayah_ar', 'text')
-    en_col = _col(df, 'ayah_en', 'translation')
-
-    jv = df[df[jc] == juz_no]
-    if jv.empty:
-        raise HTTPException(status_code=404, detail=f"Juz {juz_no} not found")
-
-    return {
-        "juz_no": juz_no, "total_verses": len(jv),
-        "verses": [{"reference": f"{int(r[sc])}:{int(r[ac])}",
-                     "arabic": r.get(ar_col, ''), "translation": r.get(en_col, '')}
-                    for _, r in jv.head(10).iterrows()],
-        "surahs_included": sorted(jv[sc].unique().tolist())
     }
 
 
@@ -1091,7 +1064,6 @@ async def get_verse(req: Dict[str, Any], request: Request):
     return {"verse": {
         "reference": f"{surah_num}:{ayah_num}", "surah": int(r[sc]), "ayah": int(r[ac]),
         "arabic": r.get('ayah_ar', ''), "translation": r.get('ayah_en', ''),
-        "juz": int(r.get('juz_no', 0)) if pd.notna(r.get('juz_no')) else None
     }}
 
 
@@ -1183,13 +1155,6 @@ async def export_search(req: dict, request: Request):
                 "filename": f"noor_{safe_name}.csv", "count": len(data)}
 
     return {"format": "json", "data": data, "filename": f"noor_{safe_name}.json", "count": len(data)}
-
-
-@app.get("/api/visualize/similarity")
-async def visualize_similarity(request: Request, query: str = ""):
-    if not query:
-        return {"nodes": [], "edges": []}
-    return await create_similarity_network(request, threshold=0.5)
 
 
 if __name__ == "__main__":

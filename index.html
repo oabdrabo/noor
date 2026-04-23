@@ -197,7 +197,6 @@
     @media(max-width:600px){
       .app{padding:12px 14px 80px}
       header{padding:32px 0 14px}
-      .logo-ar{font-size:34px}
       .header-actions{top:12px}
       .arabic{font-size:22px;padding:14px 16px}
       .tab{padding:7px 11px;font-size:11px}
@@ -554,10 +553,12 @@ createApp({
             break
           case 'similar':
             data=await post(`${API}/similar`,{reference:q,query:q,limit:15})
+            if(data.indexing){error.value=`Building search index... (${data.progress||'please wait'})`;break}
             results.value=data.similar_verses||data.results||[]
             break
           case 'tafsir':
             data=await post(`${API}/tafsir`,{reference:q})
+            if(data.indexing){error.value=`Building search index... (${data.progress||'please wait'})`;break}
             tafsirData.value=data
             results.value=data.related_verses||[]
             break
