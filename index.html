@@ -20,7 +20,7 @@
       --gold:#c9a96e;--gold2:#e8c992;--gold-bg:rgba(201,169,110,.08);--gold-border:rgba(201,169,110,.2);
       --emerald:#3d9e7c;--emerald2:#5cbf9a;--emerald-bg:rgba(61,158,124,.08);
       --danger:#d45555;--warn:#d4a055;
-      --radius:10px;--radius2:14px;--radius3:18px;
+      --radius:10px;--radius2:14px;
       --font:'Inter',system-ui,-apple-system,sans-serif;
       --font-ar:'Amiri','Traditional Arabic',serif;
       --shadow:0 2px 20px rgba(0,0,0,.25);
@@ -157,15 +157,9 @@
     .bookmark-item:last-child{margin-bottom:0}
     .no-bookmarks{text-align:center;color:var(--text3);font-size:12px;padding:20px}
 
-    /* Indexing banner */
-    .indexing-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;margin-bottom:14px;background:var(--gold-bg);border:1px solid var(--gold-border);border-radius:var(--radius);font-size:12px;color:var(--gold);animation:fadeUp .3s var(--ease)}
-    .indexing-bar .spinner-sm{width:14px;height:14px;border:2px solid var(--gold-border);border-top-color:var(--gold);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
-
-    /* Loading */
-    .loading{display:flex;flex-direction:column;align-items:center;gap:12px;padding:52px}
-    .spinner{width:28px;height:28px;border:2.5px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .6s linear infinite}
+    /* Spinners */
+    .spinner-sm{width:14px;height:14px;border:2px solid var(--gold-border);border-top-color:var(--gold);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;display:inline-block}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .loading-text{font-size:12px;color:var(--text3)}
 
     /* Skeleton */
     .skeleton{background:linear-gradient(90deg,var(--surface) 25%,var(--surface2) 50%,var(--surface) 75%);background-size:200% 100%;animation:shimmer 1.8s infinite;border-radius:var(--radius2)}
@@ -283,7 +277,7 @@
 
     <!-- Error / Indexing -->
     <div class="error-box" :class="{info:isIndexingError}" v-if="error">
-      <span v-if="isIndexingError" style="display:inline-flex;align-items:center;gap:8px"><span class="spinner-sm" style="width:14px;height:14px;border:2px solid var(--gold-border);border-top-color:var(--gold);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;display:inline-block"></span> {{error}}</span>
+      <span v-if="isIndexingError" style="display:inline-flex;align-items:center;gap:8px"><span class="spinner-sm"></span> {{error}}</span>
       <span v-else>{{error}}</span>
     </div>
 
