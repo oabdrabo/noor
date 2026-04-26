@@ -257,7 +257,7 @@
     </div>
 
     <!-- Filters -->
-    <div class="filters" v-if="(mode==='search'||mode==='advanced') && searched">
+    <div class="filters" v-if="mode==='search' && searched">
       <select class="filter-select" v-model.number="surahFilter" @change="search()">
         <option :value="0">All Surahs</option>
         <option v-for="n in 114" :value="n">Surah {{n}}</option>
@@ -415,7 +415,7 @@
             <span class="result-ref" v-else-if="r.collection">
               <span class="hadith-collection">{{r.collection}}</span> #{{r.hadith_number}}
             </span>
-            <span class="result-score" :class="scoreClass(r.score||r.final_score)" v-if="r.score||r.final_score">{{pct(r.score||r.final_score)}}</span>
+            <span class="result-score" :class="scoreClass(r.score)" v-if="r.score">{{pct(r.score)}}</span>
           </div>
           <div class="arabic" v-if="r.text && isArabic(r.text)">{{r.text}}</div>
           <div class="hadith-text" v-else-if="r.text">{{r.text}}</div>
