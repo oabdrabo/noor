@@ -45,3 +45,7 @@ Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that 
 ## Author
 
 [Omar A.](https://github.com/oabdrabo) · AI infrastructure engineer · [LinkedIn](https://linkedin.com/in/oabdrabo)
+
+---
+
+Built by [Omar A.](https://github.com/oabdrabo). Other work: **[PYXIS3](https://github.com/pyxis3-ai)** (vendor-neutral AI ops platform), [`vllm-bench`](https://github.com/pyxis3-ai/vllm-bench), [`lens`](https://github.com/oabdrabo/lens).
