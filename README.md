@@ -4,6 +4,8 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 
 نُور — *"light"* in Arabic.
 
+**Try it: [noor.jsr.bz](https://noor.jsr.bz)** — type a question in Arabic or English ("verses about patience in adversity", "حديث عن حقوق الجار") and get matches by meaning, not keyword.
+
 ## What it does
 
 - **Semantic search** in either Arabic or English; returns top matches across the Quran + major Hadith collections
@@ -41,11 +43,3 @@ The corpus → embedding → store pipeline is idempotent: re-running ingest wit
 ## Why
 
 Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that answers *intent* questions — *"verses about patience in adversity"*, *"hadith on neighbours' rights"* — and surfaces matches by meaning, not surface form. Multilingual embeddings make this practical; `sqlite-vec` makes it deployable on a Raspberry Pi.
-
-## Author
-
-[Omar A.](https://github.com/oabdrabo) · AI infrastructure engineer · [LinkedIn](https://linkedin.com/in/oabdrabo)
-
----
-
-Built by [Omar A.](https://github.com/oabdrabo). Other work: **[PYXIS3](https://github.com/pyxis3-ai)** (vendor-neutral AI ops platform), [`vllm-bench`](https://github.com/pyxis3-ai/vllm-bench), [`lens`](https://github.com/oabdrabo/lens).
