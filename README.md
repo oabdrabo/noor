@@ -43,3 +43,7 @@ The corpus → embedding → store pipeline is idempotent: re-running ingest wit
 ## Why
 
 Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that answers *intent* questions — *"verses about patience in adversity"*, *"hadith on neighbours' rights"* — and surfaces matches by meaning, not surface form. Multilingual embeddings make this practical; `sqlite-vec` makes it deployable on a Raspberry Pi.
+
+## Maintenance
+
+This repository is maintained with small, reviewable updates. Supporting documentation lives in `docs/`, example inputs live in `examples/`, and lightweight validation notes live in `tests/smoke/`.
