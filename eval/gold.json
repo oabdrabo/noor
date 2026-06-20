@@ -1,0 +1,22 @@
+[
+  {"q": "2:255", "expect": ["2:255"]},
+  {"q": "36:9", "expect": ["36:9"]},
+  {"q": "the verse of the throne, Allah the ever-living the sustainer", "expect": ["2:255"]},
+  {"q": "there is no compulsion in religion", "expect": ["2:256"]},
+  {"q": "Allah does not burden a soul beyond what it can bear", "expect": ["2:286"]},
+  {"q": "seek help through patience and prayer", "expect": ["2:153"]},
+  {"q": "by time, indeed mankind is in loss", "expect": ["103:1", "103:2", "103:3"]},
+  {"q": "say He is Allah the One, the eternal refuge", "expect": ["112:1", "112:2"]},
+  {"q": "Allah is the light of the heavens and the earth", "expect": ["24:35"]},
+  {"q": "indeed with hardship comes ease", "expect": ["94:5", "94:6"]},
+  {"q": "in the remembrance of Allah do hearts find rest", "expect": ["13:28"]},
+  {"q": "we made you peoples and tribes that you may know one another", "expect": ["49:13"]},
+  {"q": "whoever saves one life it is as if he saved all of mankind", "expect": ["5:32"]},
+  {"q": "do not despair of the mercy of Allah", "expect": ["39:53"]},
+  {"q": "call upon Me and I will respond to you", "expect": ["40:60"]},
+  {"q": "guide us to the straight path", "expect": ["1:6"]},
+  {"q": "those who spend their wealth in charity night and day", "expect": ["2:274"]},
+  {"q": "and He found you lost and guided you", "expect": ["93:7"]},
+  {"q": "the night of decree is better than a thousand months", "expect": ["97:3"]},
+  {"q": "every soul shall taste death", "expect": ["3:185", "21:35", "29:57"]}
+]
