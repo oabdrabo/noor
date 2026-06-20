@@ -168,5 +168,40 @@
     <a href="https://pyxis3.ai">PYXIS3</a>
   </nav>
 </div></footer>
+<!-- shortlink analytics — active only when served via the noor.pyxis3.ai reverse proxy
+     (host-based attribution); stays silent on raw github.io. Tracks every link/button. -->
+<script>
+(function () {
+  var H = location.hostname;
+  if (!/\.pyxis3\.ai$/.test(H)) return;
+  var q = new URLSearchParams(location.search);
+  var cid = q.get('sl_cid') || '';
+  var utm = new URLSearchParams();
+  q.forEach(function (v, k) { if (/^utm_/.test(k)) utm.set(k, v); });
+  var J = function (b) { return new Blob([JSON.stringify(b)], { type: 'application/json' }); };
+  function ev(name, value) {
+    try { navigator.sendBeacon('/api/event', J({ host: H, name: name, value: value || 0, cid: cid })); } catch (e) {}
+  }
+  function conv(label, value) {
+    new Image().src = '/api/conv?host=' + encodeURIComponent(H) + '&label=' + encodeURIComponent(label) + '&value=' + (value || 0) + '&cid=' + cid;
+  }
+  window.noorTrack = ev;
+  ev('visit');
+  if (utm.toString()) document.querySelectorAll('a[href*=".pyxis3.ai"]').forEach(function (a) {
+    try { var u = new URL(a.href); utm.forEach(function (v, k) { if (!u.searchParams.has(k)) u.searchParams.set(k, v); }); a.href = u.toString(); } catch (e) {}
+  });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a,button'); if (!a) return;
+    var h = a.getAttribute('href') || a.getAttribute('data-ev') || (a.textContent || '').trim();
+    if (/app\.noor/i.test(h))            { ev('launch');  conv('launch'); }
+    else if (/buy\.stripe/i.test(h))     { ev('sponsor'); conv('sponsor'); }
+    else if (/donate\.stripe/i.test(h))  { ev('donate');  conv('donate'); }
+    else if (/github\.com/i.test(h))       ev('source');
+    else if (/^#/.test(h))                 ev('nav');
+    else if (/pyxis3\.ai/i.test(h))        ev('pyxis3');
+    else                                   ev('click');
+  }, true);
+})();
+</script>
 </body>
 </html>
