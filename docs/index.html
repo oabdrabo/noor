@@ -9,107 +9,164 @@
 <meta property="og:description" content="Ask in Arabic or English; get matches by meaning, not keyword — with cited, grounded answers.">
 <meta property="og:image" content="https://pyxis3-ai.github.io/noor/screenshot-light.png">
 <meta property="og:type" content="website">
-<meta name="theme-color" content="#faf8f3">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='25' x='4' font-size='24'>نور</text></svg>">
+<meta name="theme-color" content="#13110b">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='25' x='3' font-size='22' fill='%23dcab4e'>نور</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#faf8f3; --ink:#1c1917; --muted:#57534e; --line:#e7e2d6; --acc:#0f766e; --acc-d:#0c5e57; --card:#fffdf9; }
-  * { box-sizing:border-box; }
-  html { scroll-behavior:smooth; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
-  .serif { font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif; }
-  a { color:var(--acc); text-decoration:none; }
-  a:hover { text-decoration:underline; }
-  .wrap { max-width:1040px; margin:0 auto; padding:0 24px; }
-  nav { display:flex; align-items:center; justify-content:space-between; padding:22px 0; }
-  nav .brand { font-size:21px; font-weight:600; letter-spacing:.01em; }
-  nav .brand .ar { margin-left:7px; color:var(--muted); font-size:19px; }
-  nav .links { display:flex; align-items:center; gap:22px; }
-  nav .links a { color:var(--ink); font-size:14px; font-weight:600; }
-  .btn { display:inline-block; padding:12px 22px; border-radius:10px; font-weight:700; font-size:15px; transition:background .15s,border-color .15s; }
-  .btn:hover { text-decoration:none; }
-  .btn.primary { background:var(--acc); color:#fff; }
-  .btn.primary:hover { background:var(--acc-d); }
-  .btn.ghost { border:1px solid var(--line); color:var(--ink); background:var(--card); }
-  .btn.ghost:hover { border-color:#cfc8b6; }
-  .btn.sm { padding:8px 16px; font-size:14px; }
-  header.hero { text-align:center; padding:64px 0 44px; }
-  header.hero .ar { font-size:62px; line-height:1; margin-bottom:10px; }
-  header.hero h1 { font-size:42px; line-height:1.1; margin:0 0 18px; font-weight:600; letter-spacing:-.015em; }
-  header.hero p.lead { font-size:19px; color:var(--muted); max-width:640px; margin:0 auto 30px; }
-  .cta { display:inline-flex; gap:12px; flex-wrap:wrap; justify-content:center; }
-  .shots { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:20px 0; }
-  .shots img, .shot-wide img { width:100%; border:1px solid var(--line); border-radius:14px; display:block; }
-  .shot-wide { margin:18px 0 4px; }
-  .cap { text-align:center; color:var(--muted); font-size:14px; margin:12px 0 0; }
-  section { padding:46px 0; border-top:1px solid var(--line); }
-  section h2 { font-size:27px; margin:0 0 26px; font-weight:600; letter-spacing:-.01em; }
-  .feat { display:grid; grid-template-columns:repeat(2,1fr); gap:26px 44px; }
-  .feat h3 { margin:0 0 6px; font-size:17px; font-weight:700; }
-  .feat p { margin:0; color:var(--muted); font-size:15px; }
-  .built { color:var(--muted); max-width:760px; }
-  .built code { background:#efeadd; padding:1px 6px; border-radius:5px; font-size:13px; color:var(--ink); }
-  footer { border-top:1px solid var(--line); padding:30px 0 52px; color:var(--muted); font-size:14px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:14px; }
-  footer .f-links { display:flex; gap:22px; }
-  footer a { color:var(--muted); }
-  @media (max-width:640px){ .shots,.feat{grid-template-columns:1fr;} header.hero .ar{font-size:52px;} header.hero h1{font-size:32px;} nav .links a:not(.btn){display:none;} }
+  :root{
+    --bg:#13110b; --panel:#1c190f; --panel2:#23200f; --line:#322c1c;
+    --text:#f1ece0; --muted:#a89f8a; --faint:#6b6450;
+    --gold:#dcab4e; --gold2:#f0cd79; --green:#5aa98c;
+    --gold-soft:rgba(220,171,78,.14); --green-soft:rgba(90,169,140,.13);
+    --display:"Cormorant Garamond",Georgia,serif;
+    --arabic:"Amiri",serif;
+    --body:"Inter",system-ui,-apple-system,sans-serif;
+    --maxw:1080px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);line-height:1.65;-webkit-font-smoothing:antialiased}
+  a{color:var(--gold);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  .ar{font-family:var(--arabic)}
+  /* top rule of light */
+  .rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--green) 70%,transparent);opacity:.6}
+  /* nav */
+  nav.bar{position:sticky;top:0;z-index:20;backdrop-filter:blur(16px) saturate(140%);background:rgba(19,17,11,.72);border-bottom:1px solid var(--line)}
+  nav.bar .wrap{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .brand{font-family:var(--display);font-weight:600;font-size:23px;letter-spacing:.01em}
+  .brand .ar{margin-left:8px;color:var(--gold);font-size:21px}
+  nav.bar .links{display:flex;align-items:center;gap:24px}
+  nav.bar .links a{color:var(--muted);font-size:14px;font-weight:500}
+  nav.bar .links a:hover{color:var(--text);text-decoration:none}
+  .btn{display:inline-block;border-radius:10px;font-weight:600;font-size:15px;padding:11px 21px;transition:filter .15s,border-color .15s,background .15s}
+  .btn:hover{text-decoration:none}
+  .btn.primary{background:linear-gradient(95deg,var(--gold),var(--gold2));color:#1a1408}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn.ghost{border:1px solid var(--line);color:var(--text);background:var(--panel)}
+  .btn.ghost:hover{border-color:#4a4230}
+  .btn.sm{padding:8px 16px;font-size:14px}
+  /* hero */
+  header.hero{position:relative;text-align:center;padding:86px 0 36px;overflow:hidden}
+  header.hero::before{content:"";position:absolute;inset:-20% 0 auto;height:520px;background:radial-gradient(50% 60% at 50% 0,var(--gold-soft),transparent 72%);pointer-events:none}
+  header.hero .glyph{position:relative;font-family:var(--arabic);font-size:84px;line-height:1;color:var(--gold);text-shadow:0 0 38px rgba(220,171,78,.35);margin-bottom:14px}
+  header.hero h1{position:relative;font-family:var(--display);font-weight:600;font-size:clamp(40px,6vw,64px);line-height:1.04;letter-spacing:-.01em;margin:0 auto 18px;max-width:780px}
+  header.hero h1 em{font-style:italic;color:var(--gold)}
+  header.hero p.lead{position:relative;font-size:19px;color:var(--muted);max-width:660px;margin:0 auto 30px}
+  header.hero p.lead em{color:var(--text);font-style:italic}
+  .cta{position:relative;display:inline-flex;gap:13px;flex-wrap:wrap;justify-content:center}
+  /* shots */
+  .shot-frame{margin:40px auto 0;max-width:980px;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.7)}
+  .shot-frame img{width:100%;display:block}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:18px 0}
+  .pair img{width:100%;border:1px solid var(--line);border-radius:14px;display:block}
+  .cap{text-align:center;color:var(--faint);font-size:13.5px;margin-top:14px}
+  /* sections */
+  section{padding:62px 0;border-top:1px solid var(--line)}
+  .eyebrow{font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:600;margin-bottom:12px}
+  section h2{font-family:var(--display);font-weight:600;font-size:clamp(28px,3.6vw,40px);line-height:1.1;margin:0 0 8px;max-width:620px}
+  section .sub{color:var(--muted);max-width:600px;margin:0 0 34px}
+  .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .feat{background:var(--bg);padding:26px 24px}
+  .feat .tag{font-size:11px;letter-spacing:.13em;color:var(--gold);font-weight:700;text-transform:uppercase}
+  .feat h3{font-family:var(--display);font-weight:600;font-size:21px;margin:10px 0 7px}
+  .feat p{margin:0;color:var(--muted);font-size:14.5px;line-height:1.6}
+  /* built */
+  .built{color:var(--muted);max-width:780px;font-size:16px}
+  .built code{background:var(--panel2);padding:2px 7px;border-radius:6px;font-size:13.5px;color:var(--gold2);font-family:ui-monospace,monospace}
+  /* support */
+  .support{text-align:center}
+  .support h2{margin-left:auto;margin-right:auto}
+  .support .sub{margin-left:auto;margin-right:auto}
+  .donate-row{display:flex;gap:13px;justify-content:center;flex-wrap:wrap}
+  .donate{display:inline-flex;align-items:center;gap:9px;border-radius:999px;padding:13px 26px;font-weight:700;font-size:15px}
+  .donate.once{background:linear-gradient(95deg,var(--gold),var(--gold2));color:#1a1408}
+  .donate.month{border:1px solid var(--line);color:var(--text);background:var(--panel)}
+  .donate:hover{text-decoration:none;filter:brightness(1.06)}
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:34px 0 56px;color:var(--faint);font-size:14px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;align-items:center}
+  footer .brand{font-size:19px;color:var(--text)}
+  footer nav{display:flex;gap:22px}
+  footer nav a{color:var(--muted)}
+  @media (max-width:760px){.feats{grid-template-columns:1fr}.pair{grid-template-columns:1fr}nav.bar .links a:not(.btn){display:none}header.hero .glyph{font-size:64px}}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="rule"></div>
+<nav class="bar"><div class="wrap">
+  <span class="brand">Noor<span class="ar">نور</span></span>
+  <span class="links">
+    <a href="#features">Features</a>
+    <a href="https://github.com/pyxis3-ai/noor">Source</a>
+    <a class="btn primary sm" href="https://app.noor.pyxis3.ai">Launch ↗</a>
+  </span>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <div class="glyph">نُور</div>
+  <h1>Search the Qur'an &amp; Hadith <em>by meaning</em>.</h1>
+  <p class="lead">Noor is AI semantic search over the Qur'an and Hadith. Ask in Arabic or English — <em>"verses about patience in adversity"</em>, <em>"حديث عن حقوق الجار"</em> — and get matches by meaning, not keyword, with cited and grounded answers.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://app.noor.pyxis3.ai">Launch noor ↗</a>
+    <a class="btn ghost" href="https://github.com/pyxis3-ai/noor">View source</a>
+  </div>
+  <div class="shot-frame"><img src="screenshot-dark.png" alt="Noor semantic search" loading="lazy"></div>
+</div></header>
+
+<section id="features"><div class="wrap">
+  <div class="eyebrow">What it does</div>
+  <h2>Study by intent, not by keyword.</h2>
+  <p class="sub">One interface over the Qur'an and the major Hadith collections — in Arabic or English.</p>
+  <div class="feats">
+    <div class="feat"><span class="tag">Search</span><h3>Semantic search</h3><p>Ask in Arabic or English; get the closest verses and hadith ranked by meaning, not surface form.</p></div>
+    <div class="feat"><span class="tag">Answers</span><h3>Grounded Q&amp;A</h3><p>Retrieves the most relevant passages, then writes a cited answer drawn from only those sources.</p></div>
+    <div class="feat"><span class="tag">Voice</span><h3>Voice search</h3><p>Speak a question; it's transcribed and run through whichever mode you're in.</p></div>
+    <div class="feat"><span class="tag">Reference</span><h3>Reference lookup</h3><p>A reference like <code>2:255</code> resolves straight to the verse.</p></div>
+    <div class="feat"><span class="tag">Topics</span><h3>Topic discovery</h3><p>TF-IDF and clustering surface concepts and themes across the corpus.</p></div>
+    <div class="feat"><span class="tag">Themes</span><h3>Light &amp; dark</h3><p>An Arabic-first interface that stays calm to read in either theme.</p></div>
+  </div>
+</div></section>
+
+<section id="answers"><div class="wrap">
+  <div class="eyebrow">Grounded answers</div>
+  <h2>Every claim, cited to its source.</h2>
+  <p class="sub">Noor never answers from thin air — it retrieves first, then writes only from what it found, citing each verse and hadith inline.</p>
+  <div class="shot-frame"><img src="screenshot-qa.png" alt="Noor grounded Q&amp;A with inline citations" loading="lazy"></div>
+  <div class="pair" style="margin-top:18px">
+    <img src="screenshot-light.png" alt="Noor — light theme" loading="lazy">
+    <img src="screenshot-dark.png" alt="Noor — dark theme" loading="lazy">
+  </div>
+  <p class="cap">Arabic-first, in light or dark.</p>
+</div></section>
+
+<section id="built"><div class="wrap">
+  <div class="eyebrow">How it's built</div>
+  <h2>The whole index is one file.</h2>
+  <p class="built">Multilingual embeddings in a <code>sqlite-vec</code> vector store — the entire corpus index is a single SQLite file, deployable on hardware as small as a Raspberry Pi. A <code>FastAPI</code> backend, a single-file <code>Vue 3</code> frontend, and <code>nginx</code> at the edge. Q&amp;A and voice are reached server-side, so no model keys ever reach the browser.</p>
+</div></section>
+
+<section class="support" id="support"><div class="wrap">
+  <div class="eyebrow" style="text-align:center">Support &amp; sponsors</div>
+  <h2>Free, open, and ad-free.</h2>
+  <p class="sub">Noor has no tracking and no ads. If it's useful to you, you can support continued development — pay what you like, once or monthly.</p>
+  <div class="donate-row">
+    <a class="donate once" href="https://donate.stripe.com/3cI6oI7Gh1PG0eV8MJ5kk00">☕ Donate once</a>
+    <a class="donate month" href="https://buy.stripe.com/00wbJ2f8J51S9Pv1kh5kk01">💜 Sponsor monthly</a>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <span class="brand">Noor<span class="ar" style="color:var(--gold);margin-left:7px">نور</span></span>
   <nav>
-    <div class="brand serif">Noor<span class="ar">نور</span></div>
-    <div class="links">
-      <a href="#features">Features</a>
-      <a href="https://github.com/pyxis3-ai/noor">Source</a>
-      <a class="btn primary sm" href="https://noor.pyxis3.ai">Launch ↗</a>
-    </div>
+    <a href="https://app.noor.pyxis3.ai">Launch</a>
+    <a href="https://github.com/pyxis3-ai/noor">Source</a>
+    <a href="https://donate.stripe.com/3cI6oI7Gh1PG0eV8MJ5kk00">Donate</a>
+    <a href="https://pyxis3.ai">PYXIS3</a>
   </nav>
-
-  <header class="hero">
-    <div class="ar serif">نُور</div>
-    <h1 class="serif">Search the Qur'an &amp; Hadith by meaning</h1>
-    <p class="lead">Noor is AI semantic search over the Qur'an and Hadith. Ask in Arabic or English — <em>"verses about patience in adversity"</em>, <em>"حديث عن حقوق الجار"</em> — and get matches by meaning, not keyword, with cited and grounded answers.</p>
-    <div class="cta">
-      <a class="btn primary" href="https://noor.pyxis3.ai">Launch noor ↗</a>
-      <a class="btn ghost" href="https://github.com/pyxis3-ai/noor">View source</a>
-    </div>
-  </header>
-
-  <div class="shots">
-    <div><img src="screenshot-light.png" alt="Noor semantic search — light theme" loading="lazy"></div>
-    <div><img src="screenshot-dark.png" alt="Noor semantic search — dark theme" loading="lazy"></div>
-  </div>
-
-  <div class="shot-wide">
-    <img src="screenshot-qa.png" alt="Noor — grounded Q&amp;A with inline citations" loading="lazy">
-    <p class="cap">Grounded Q&amp;A — a synthesised answer with every claim cited to the retrieved verses &amp; hadith.</p>
-  </div>
-
-  <section id="features">
-    <h2 class="serif">What it does</h2>
-    <div class="feat">
-      <div><h3>Semantic search</h3><p>Arabic or English, across the Qur'an and major Hadith collections — ranked by meaning, not surface form.</p></div>
-      <div><h3>Grounded Q&amp;A</h3><p>Retrieves the most relevant passages, then writes a cited answer drawn from only those sources.</p></div>
-      <div><h3>Voice search</h3><p>Speak a question; it's transcribed and run through whichever mode you're in.</p></div>
-      <div><h3>Reference lookup</h3><p>A reference like <code>2:255</code> resolves straight to the verse.</p></div>
-      <div><h3>Topic discovery</h3><p>TF-IDF and clustering surface concepts and themes across the corpus.</p></div>
-      <div><h3>Light &amp; dark</h3><p>An Arabic-first interface that stays calm to read in either theme.</p></div>
-    </div>
-  </section>
-
-  <section id="built">
-    <h2 class="serif">How it's built</h2>
-    <p class="built">Multilingual embeddings in a <code>sqlite-vec</code> vector store — the entire index is a single SQLite file, deployable on hardware as small as a Raspberry Pi. A <code>FastAPI</code> backend, a single-file <code>Vue&nbsp;3</code> frontend, and <code>nginx</code> at the edge. Q&amp;A and voice are reached server-side, so no model keys ever reach the browser.</p>
-  </section>
-
-  <footer>
-    <div>Part of <a href="https://pyxis3.ai">PYXIS3</a> · open-source under the MIT license</div>
-    <div class="f-links">
-      <a href="https://noor.pyxis3.ai">Launch</a>
-      <a href="https://github.com/pyxis3-ai/noor">Source</a>
-      <a href="https://pyxis3.ai">PYXIS3</a>
-    </div>
-  </footer>
-</div>
+</div></footer>
 </body>
 </html>
