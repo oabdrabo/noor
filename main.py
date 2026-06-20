@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("noor")
 
-MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+MODEL_NAME = "intfloat/multilingual-e5-small"
 EMBED_DIM = 384
 BATCH = 64
 
@@ -209,7 +209,7 @@ def _index_quran(state, stop):
     en = df[COL_EN].astype(str).to_numpy()
     surah = df[COL_SURAH].to_numpy()
     ayah = df[COL_AYAH].to_numpy()
-    texts = [f"{a} {e}" for a, e in zip(ar, en)]
+    texts = [f"passage: {e}" for e in en]
 
     def persist(i, embeddings):
         rows = range(i, min(i + BATCH, total))
@@ -278,7 +278,7 @@ def _index_hadith(state, stop):
         db.commit()
         count = 0
 
-    texts = [r["text"].strip()[:2000] or "[No text]" for r in records]
+    texts = ["passage: " + (r["text"].strip()[:2000] or "[No text]") for r in records]
 
     def persist(i, embeddings):
         batch = records[i : i + BATCH]
@@ -340,7 +340,7 @@ async def lifespan(app: FastAPI):
 
     @lru_cache(maxsize=2048)
     def embed(text):
-        return np.asarray(model.encode(text), dtype=np.float32)
+        return np.asarray(model.encode("query: " + text), dtype=np.float32)
 
     s = app.state
     s.model = model
@@ -653,8 +653,8 @@ def theme_clusters(request: Request):
         from sklearn.cluster import KMeans
         from sklearn.feature_extraction.text import TfidfVectorizer
 
-        sample = s.df_verses.sample(n=min(1000, len(s.df_verses)), random_state=42)
-        texts = (sample[COL_AR] + " " + sample[COL_EN]).tolist()
+        sample = s.df_verses.sample(n=min(400, len(s.df_verses)), random_state=42)
+        texts = ["passage: " + e for e in sample[COL_EN].astype(str)]
         embeddings = np.asarray(s.model.encode(texts, batch_size=32), dtype=np.float32)
         labels = KMeans(n_clusters=15, random_state=42, n_init=10).fit_predict(
             embeddings
