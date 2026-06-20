@@ -19,3 +19,12 @@ Run before and after any embedding or indexing change to prove it helped, not ju
 | self-retrieval (n=40) | 38% | 40% | 0.39 |
 
 Self-retrieval at 40% is the tell: English queries are matched against half-Arabic document vectors. Fix = embed Arabic and English separately + a stronger encoder, then re-run.
+
+## After (e5-small, English-passage vectors, `query:`/`passage:` prefixes)
+
+| set | Recall@1 | Recall@10 | MRR |
+|---|---|---|---|
+| curated (n=20) | 70% | 90% | 0.76 |
+| self-retrieval (n=40) | 100% | 100% | 1.00 |
+
+Self-retrieval is now perfect and curated Recall@10 went 50% → 90% — the Arabic+English concatenation was the dominant defect.
