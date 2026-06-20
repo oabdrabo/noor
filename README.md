@@ -4,7 +4,7 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 
 نُور — *"light"* in Arabic.
 
-**Try it: [noor.pyxis3.ai](https://noor.pyxis3.ai)** — type a question in Arabic or English ("verses about patience in adversity", "حديث عن حقوق الجار") and get matches by meaning, not keyword.
+**Try it: [app.noor.pyxis3.ai](https://app.noor.pyxis3.ai)** — type a question in Arabic or English ("verses about patience in adversity", "حديث عن حقوق الجار") and get matches by meaning, not keyword. ([noor.pyxis3.ai](https://noor.pyxis3.ai) is the project landing.)
 
 <p align="center">
   <img src="docs/screenshot-light.png" alt="Noor — search, light" width="49%">
