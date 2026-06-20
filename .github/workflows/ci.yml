@@ -7,16 +7,14 @@ on:
     branches: [main]
 
 jobs:
-  repository-checks:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect repository
-        run: |
-          git status --short
-          find . -maxdepth 2 -type f | sort | sed -n '1,80p'
-      - name: Check documentation
-        run: |
-          test -f README.md
-          test -f docs/project-overview.md
-          test -f docs/operations.md
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff format --check .
+      - run: ruff check .
+      - run: python -m compileall main.py

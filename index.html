@@ -115,7 +115,7 @@
 
     /* QA */
     .qa-answer{background:var(--gold-bg);border-radius:var(--radius2);padding:20px;margin-bottom:14px;border-left:3px solid var(--gold)}
-    .qa-answer p{font-size:14px;line-height:1.9;color:var(--text)}
+    .qa-answer p{font-size:14px;line-height:1.9;color:var(--text);white-space:pre-wrap}
     .qa-type{font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px}
 
     /* Count */
@@ -228,7 +228,7 @@
       <h3><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:var(--gold);fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> Bookmarks ({{bookmarks.length}})</h3>
       <div v-if="bookmarks.length">
         <div class="bookmark-item" v-for="(b,i) in bookmarks" :key="b.ref">
-          <span style="cursor:pointer" @click="query=b.ref;mode='tafsir';search()">
+          <span style="cursor:pointer" @click="query=b.ref;mode='search';search()">
             <strong style="color:var(--gold)">{{b.ref}}</strong>
             <span style="color:var(--text3);margin-inline-start:8px">{{b.text?.slice(0,50)}}...</span>
           </span>
@@ -249,6 +249,9 @@
     <div class="search-wrap" v-if="currentMode.hasSearch!==false">
       <div class="search-box">
         <input ref="searchInput" v-model="query" :placeholder="currentMode.placeholder" :dir="isArabic(query)?'rtl':'ltr'" @keydown.enter="search" @keydown.escape="query=''">
+        <button class="search-btn" @click="toggleMic" :title="recording?'Stop recording':'Voice search'" :style="{background:recording?'var(--danger)':'var(--surface2)',width:'34px',height:'34px'}">
+          <svg viewBox="0 0 24 24" :style="{stroke:recording?'#fff':'var(--text2)'}"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+        </button>
         <button class="search-btn" @click="search" :disabled="loading">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         </button>
@@ -287,23 +290,19 @@
       <!-- QA -->
       <template v-if="mode==='qa' && qaAnswer">
         <div class="qa-answer">
-          <div class="qa-type">{{qaAnswer.question_type}} &middot; {{qaAnswer.sources_count}} sources</div>
+          <div class="qa-type">Answer &middot; {{qaAnswer.citations?.length||0}} sources</div>
           <p>{{qaAnswer.answer}}</p>
         </div>
-        <template v-for="(r,i) in qaAnswer.relevant_verses" :key="i">
-          <div class="result" :style="{animationDelay:i*50+'ms'}">
-            <div class="result-head">
-              <span class="result-ref">{{r.surah}}:{{r.ayah}}</span>
-              <span class="result-score" :class="scoreClass(r.score)">{{pct(r.score)}}</span>
-            </div>
-            <div class="arabic" v-if="r.text">{{r.text}}</div>
-            <div class="translation">{{r.translation}}</div>
-            <div class="result-actions">
-              <button class="action-btn" @click="copy(r)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button>
-              <button class="action-btn" :class="{bookmarked:isBookmarked(r)}" @click="toggleBookmark(r)"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{isBookmarked(r)?'Saved':'Save'}}</button>
-            </div>
+        <div class="result" v-for="(r,i) in qaAnswer.citations" :key="i" :style="{animationDelay:i*50+'ms'}">
+          <div class="result-head">
+            <span class="result-ref" v-if="r.surah">{{r.surah}}:{{r.ayah}}</span>
+            <span class="result-ref" v-else-if="r.collection"><span class="hadith-collection">{{r.collection}}</span> #{{r.hadith_number}}</span>
+            <span class="result-score" :class="scoreClass(r.score)" v-if="r.score">{{pct(r.score)}}</span>
           </div>
-        </template>
+          <div class="arabic" v-if="r.text && isArabic(r.text)">{{r.text}}</div>
+          <div class="hadith-text" v-else-if="r.text">{{r.text}}</div>
+          <div class="translation" v-if="r.translation">{{r.translation}}</div>
+        </div>
       </template>
 
       <!-- Count -->
@@ -401,14 +400,8 @@
         </div>
       </template>
 
-      <!-- Search / Hadith / Similar / Tafsir -->
+      <!-- Search / Hadith -->
       <template v-else>
-        <div v-if="tafsirData" class="qa-answer" style="margin-bottom:12px">
-          <div class="arabic" v-if="tafsirData.verse" style="border-right:none;background:transparent;padding:0 0 12px">{{tafsirData.verse}}</div>
-          <div class="translation">{{tafsirData.translation}}</div>
-          <p style="margin-top:10px;font-size:11px;color:var(--text3)">{{tafsirData.note}}</p>
-        </div>
-
         <div class="result" v-for="(r,i) in results" :key="i" :style="{animationDelay:i*40+'ms'}">
           <div class="result-head">
             <span class="result-ref" v-if="r.surah">{{r.surah}}:{{r.ayah}}</span>
@@ -423,7 +416,6 @@
           <div class="result-actions">
             <button class="action-btn" @click="copy(r)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button>
             <button class="action-btn" :class="{bookmarked:isBookmarked(r)}" v-if="r.surah" @click="toggleBookmark(r)"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{isBookmarked(r)?'Saved':'Save'}}</button>
-            <button class="action-btn" v-if="r.surah" @click="query=r.surah+':'+r.ayah;mode='tafsir';search()"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg> Tafsir</button>
             <button class="action-btn" v-if="r.surah" @click="query=r.translation||r.text;mode='search';search()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Similar</button>
             <button class="action-btn" @click="shareVerse(r)"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> Share</button>
           </div>
@@ -431,7 +423,7 @@
       </template>
 
       <!-- Empty -->
-      <div class="empty" v-if="!loading && !error && !results.length && !qaAnswer && !countResult && !themes && !tafsirData && searched && mode!=='analytics' && mode!=='browse'">
+      <div class="empty" v-if="!loading && !error && !results.length && !qaAnswer && !countResult && !themes && searched && mode!=='analytics' && mode!=='browse'">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <h3>No results found</h3>
         <p>Try different keywords or another mode</p>
@@ -456,11 +448,11 @@ createApp({
     const qaAnswer=ref(null)
     const countResult=ref(null)
     const themes=ref(null)
-    const tafsirData=ref(null)
     const stats=ref(null)
     const toast=ref('')
     const searched=ref(false)
     const searchInput=ref(null)
+    const recording=ref(false)
     const surahFilter=ref(0)
     const showBookmarks=ref(false)
     const bookmarks=ref(JSON.parse(localStorage.getItem('noor-bookmarks')||'[]'))
@@ -476,8 +468,6 @@ createApp({
       {id:'search',label:'Search',placeholder:'Search the Quran...',hasSearch:true},
       {id:'hadith',label:'Hadith',placeholder:'Search hadith collections...',hasSearch:true},
       {id:'qa',label:'Q&A',placeholder:'Ask a question...',hasSearch:true},
-      {id:'similar',label:'Similar',placeholder:'Verse text or reference...',hasSearch:true},
-      {id:'tafsir',label:'Tafsir',placeholder:'Reference (e.g. 2:255)',hasSearch:true},
       {id:'count',label:'Count',placeholder:'Count a word...',hasSearch:true},
       {id:'browse',label:'Browse',hasSearch:false},
       {id:'themes',label:'Themes',hasSearch:false},
@@ -488,8 +478,7 @@ createApp({
 
     const suggestions=[
       {label:'Mercy',q:'mercy'},{label:'Patience',q:'patience'},
-      {label:'Ayatul Kursi',q:'2:255',mode:'tafsir'},
-      {label:'Prayer',q:'What is the importance of prayer?',mode:'qa'},
+      {label:'Ayatul Kursi',q:'2:255'},{label:'Why pray?',q:'Why is prayer important in Islam?',mode:'qa'},
       {label:'Paradise',q:'paradise'},{label:'Forgiveness',q:'forgiveness'},
       {label:'Prophet',q:'Prophet Muhammad',mode:'hadith'},
       {label:'Justice',q:'justice'},{label:'Knowledge',q:'knowledge'},
@@ -514,17 +503,40 @@ createApp({
 
     function switchMode(m){
       mode.value=m.id
-      searched.value=false;results.value=[];qaAnswer.value=null;countResult.value=null;themes.value=null;tafsirData.value=null;error.value=''
+      searched.value=false;results.value=[];qaAnswer.value=null;countResult.value=null;themes.value=null;error.value=''
       if(m.id==='themes')loadThemes()
       else if(m.id==='analytics')loadAnalytics()
       else if(m.id==='browse'){browseSurah.value=null;browseSurahData.value=null}
       else nextTick(()=>searchInput.value?.focus())
     }
 
+    let mediaRecorder=null,audioChunks=[]
+    async function toggleMic(){
+      if(recording.value){mediaRecorder&&mediaRecorder.stop();return}
+      if(!navigator.mediaDevices?.getUserMedia){showToast('Microphone unavailable');return}
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true})
+        audioChunks=[];mediaRecorder=new MediaRecorder(stream)
+        mediaRecorder.ondataavailable=e=>e.data.size&&audioChunks.push(e.data)
+        mediaRecorder.onstop=async()=>{
+          stream.getTracks().forEach(t=>t.stop());recording.value=false
+          const fd=new FormData();fd.append('audio',new Blob(audioChunks,{type:'audio/webm'}),'audio.webm')
+          loading.value=true;error.value=''
+          try{
+            const r=await fetch(`${API}/transcribe`,{method:'POST',body:fd})
+            if(!r.ok)throw new Error('Transcription failed')
+            const d=await r.json()
+            if(d.text){query.value=d.text;search()}else{loading.value=false;showToast('No speech detected')}
+          }catch(e){loading.value=false;error.value=e.message||'Transcription failed'}
+        }
+        mediaRecorder.start();recording.value=true
+      }catch(e){showToast('Microphone access denied')}
+    }
+
     async function search(){
       const q=query.value.trim()
       if(!q&&currentMode.value?.hasSearch!==false)return
-      loading.value=true;error.value='';results.value=[];qaAnswer.value=null;countResult.value=null;themes.value=null;tafsirData.value=null;searched.value=true
+      loading.value=true;error.value='';results.value=[];qaAnswer.value=null;countResult.value=null;themes.value=null;searched.value=true
 
       try{
         let data
@@ -541,20 +553,9 @@ createApp({
             results.value=data.results||[]
             break
           case 'qa':
-            data=await post(`${API}/qa`,{question:q,context_limit:5})
+            data=await post(`${API}/qa`,{question:q})
             if(data.indexing){error.value=`Building search index... (${data.progress||'please wait'})`;break}
             qaAnswer.value=data
-            break
-          case 'similar':
-            data=await post(`${API}/similar`,{reference:q,query:q,limit:15})
-            if(data.indexing){error.value=`Building search index... (${data.progress||'please wait'})`;break}
-            results.value=data.similar_verses||data.results||[]
-            break
-          case 'tafsir':
-            data=await post(`${API}/tafsir`,{reference:q})
-            if(data.indexing){error.value=`Building search index... (${data.progress||'please wait'})`;break}
-            tafsirData.value=data
-            results.value=data.related_verses||[]
             break
           case 'count':
             data=await post(`${API}/count`,{word:q})
@@ -651,11 +652,11 @@ createApp({
     onUnmounted(()=>document.removeEventListener('keydown',onKeydown))
 
     return{
-      query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,tafsirData,
+      query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
       stats,toast,searched,suggestions,searchInput,surahFilter,showBookmarks,bookmarks,
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
       isArabic,pct,fmt,scoreClass,distPct,distColor,
-      switchMode,search,loadSurah,copy,shareVerse,
+      switchMode,search,loadSurah,copy,shareVerse,toggleMic,recording,
       isBookmarked,toggleBookmark,removeBookmark,showToast
     }
   }

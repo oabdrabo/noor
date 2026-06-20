@@ -9,10 +9,12 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 ## What it does
 
 - **Semantic search** in either Arabic or English; returns top matches across the Quran + major Hadith collections
-- **Arabic-aware normalisation** (diacritics, tashkeel, alef variants, hamza on/below) before embedding
+- **Reference lookup** (e.g. `2:255`) resolves directly to the verse
+- **Grounded Q&A (RAG)** — retrieves the most relevant verses and hadith, then an LLM writes a cited answer from *only* those passages
+- **Voice search** — speak a question; it's transcribed and run through whichever mode you're in
 - **Vector store** backed by `sqlite-vec` — embeddings live in a single SQLite file, no separate DB to operate
 - **TF-IDF + KMeans clustering** for topic discovery and concept maps
-- **Word-cloud generation** per topic / query
+- **Word-cloud generation** over the corpus
 - FastAPI backend, single-page Vue 3 frontend, nginx in front
 
 ## Stack
@@ -29,21 +31,22 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 
 ```sh
 pip install -r requirements.txt
+export NOOR_DATA_DIR=./data   # holds quran-dataset.csv; models and vectors.db are created here
 python main.py
 # API on http://localhost:8000
 # Frontend served via nginx at http://localhost:3000 (see nginx.conf)
 ```
 
+`NOOR_DATA_DIR` defaults to `/config`. The Quran CSV must be present there; Hadith collections are fetched from a CDN on first run.
+
 ## Architecture notes
 
-The encoder is loaded lazily on first request so cold-start cost is paid once. Heavy ML libraries (`sklearn`, `wordcloud`) are imported lazily through small accessor functions to keep import time low for the API process.
+The encoder loads at startup; the corpus is indexed in a background thread so the API serves immediately and reports progress via `/api/health`. `sklearn` (clustering) and `wordcloud` are imported lazily inside the analytics endpoints that use them, keeping their import cost off the main request path.
 
-The corpus → embedding → store pipeline is idempotent: re-running ingest with the same source files is a no-op via row hashing.
+Indexing is idempotent: re-running skips already-indexed rows via a count-based resume, and changing the embedding model triggers a full rebuild. Storage paths are rooted at `NOOR_DATA_DIR`.
+
+Q&A and voice are backed by two optional services, reached server-side so no model keys reach the browser: a Claude-compatible gateway (`AIGW_URL`, `AIGW_KEY`, `AIGW_MODEL`) for grounded answers, and a Whisper transcription service (`STT_URL`, `STT_MODEL`) for voice. If either is unset or unreachable, only its endpoint returns 502 — the rest of the app is unaffected.
 
 ## Why
 
 Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that answers *intent* questions — *"verses about patience in adversity"*, *"hadith on neighbours' rights"* — and surfaces matches by meaning, not surface form. Multilingual embeddings make this practical; `sqlite-vec` makes it deployable on a Raspberry Pi.
-
-## Maintenance
-
-This repository is maintained with small, reviewable updates. Supporting documentation lives in `docs/`, example inputs live in `examples/`, and lightweight validation notes live in `tests/smoke/`.

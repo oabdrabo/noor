@@ -4,8 +4,8 @@ __pycache__/
 dist/
 build/
 .env
-*.csv
-*.json
-!package.json
 .venv/
 venv/
+*.csv
+*.db
+/data/
