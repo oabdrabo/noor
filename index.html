@@ -520,12 +520,11 @@ createApp({
         mediaRecorder.ondataavailable=e=>e.data.size&&audioChunks.push(e.data)
         mediaRecorder.onstop=async()=>{
           stream.getTracks().forEach(t=>t.stop());recording.value=false
-          const fd=new FormData();fd.append('audio',new Blob(audioChunks,{type:'audio/webm'}),'audio.webm')
+          const blob=new Blob(audioChunks,{type:'audio/webm'})
+          const b64=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.readAsDataURL(blob)})
           loading.value=true;error.value=''
           try{
-            const r=await fetch(`${API}/transcribe`,{method:'POST',body:fd})
-            if(!r.ok)throw new Error('Transcription failed')
-            const d=await r.json()
+            const d=await post(`${API}/transcribe`,{audio:b64,content_type:'audio/webm'})
             if(d.text){query.value=d.text;search()}else{loading.value=false;showToast('No speech detected')}
           }catch(e){loading.value=false;error.value=e.message||'Transcription failed'}
         }

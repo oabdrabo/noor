@@ -16,7 +16,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -116,6 +116,11 @@ class CountQuery(BaseModel):
 class QAQuery(BaseModel):
     question: str
     limit: int = Field(5, ge=1, le=10)
+
+
+class TranscribeQuery(BaseModel):
+    audio: str
+    content_type: str = "audio/webm"
 
 
 def _connect():
@@ -250,23 +255,29 @@ def _download_hadith(stop):
 
 def _index_hadith(state, stop):
     db = state.db
-    marker = db.execute("SELECT value FROM meta WHERE key='hadith_total'").fetchone()
+    target = db.execute("SELECT value FROM meta WHERE key='hadith_total'").fetchone()
     count = db.execute("SELECT COUNT(*) FROM hadith_vec").fetchone()[0]
-    if marker and count == int(marker[0]):
+    if target and count >= int(target[0]):
         state.hadith_ready = True
         return
-
-    db.execute("DELETE FROM hadith_vec")
-    db.execute("DROP TABLE IF EXISTS hadith_metadata")
-    _create_hadith_metadata(db)
-    db.execute("DELETE FROM meta WHERE key='hadith_total'")
-    db.commit()
 
     logger.info("Downloading hadith collections")
     records = _download_hadith(stop)
     if records is None:
         return
     total = len(records)
+
+    if not target:
+        db.execute("DELETE FROM hadith_vec")
+        db.execute("DROP TABLE IF EXISTS hadith_metadata")
+        _create_hadith_metadata(db)
+        db.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('hadith_total', ?)",
+            [str(total)],
+        )
+        db.commit()
+        count = 0
+
     texts = [r["text"].strip()[:2000] or "[No text]" for r in records]
 
     def persist(i, embeddings):
@@ -285,13 +296,8 @@ def _index_hadith(state, stop):
             [(first + k, serialize_f32(embeddings[k])) for k in range(len(batch))],
         )
 
-    logger.info("Indexing Hadith (%d)", total)
-    if _run_batches(state, stop, texts, "Hadith", 0, persist):
-        db.execute(
-            "INSERT OR REPLACE INTO meta (key, value) VALUES ('hadith_total', ?)",
-            [str(total)],
-        )
-        db.commit()
+    logger.info("Indexing Hadith (%d/%d)", count, total)
+    if _run_batches(state, stop, texts, "Hadith", count, persist):
         state.hadith_ready = True
         logger.info("Hadith index complete (%d)", total)
 
@@ -567,14 +573,12 @@ def qa(query: QAQuery, request: Request):
 
 
 @app.post("/api/transcribe")
-def transcribe(audio: UploadFile = File(...)):
-    return {
-        "text": _stt(
-            audio.file.read(),
-            audio.filename or "audio.webm",
-            audio.content_type or "audio/webm",
-        )
-    }
+def transcribe(query: TranscribeQuery):
+    try:
+        audio = base64.b64decode(query.audio, validate=True)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid audio")
+    return {"text": _stt(audio, "audio.webm", query.content_type)}
 
 
 @app.post("/api/count")
