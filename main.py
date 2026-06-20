@@ -136,22 +136,20 @@ def _connect():
     return db
 
 
+def _create_hadith_metadata(db):
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS hadith_metadata "
+        "(hadith_id INTEGER PRIMARY KEY AUTOINCREMENT, collection TEXT, hadith_number TEXT, text TEXT, reference TEXT)"
+    )
+
+
 def _init_schema(db):
     db.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
     db.execute(
         "CREATE TABLE IF NOT EXISTS quran_metadata "
         "(verse_id INTEGER PRIMARY KEY, surah INTEGER, ayah INTEGER, text TEXT, translation TEXT)"
     )
-    db.execute(
-        "CREATE TABLE IF NOT EXISTS hadith_metadata "
-        "(hadith_id INTEGER PRIMARY KEY AUTOINCREMENT, collection TEXT, hadith_number TEXT, text TEXT, reference TEXT)"
-    )
-    db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_quran_surah ON quran_metadata(surah, ayah)"
-    )
-    db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_hadith_collection ON hadith_metadata(collection)"
-    )
+    _create_hadith_metadata(db)
     db.commit()
 
 
@@ -259,7 +257,8 @@ def _index_hadith(state, stop):
         return
 
     db.execute("DELETE FROM hadith_vec")
-    db.execute("DELETE FROM hadith_metadata")
+    db.execute("DROP TABLE IF EXISTS hadith_metadata")
+    _create_hadith_metadata(db)
     db.execute("DELETE FROM meta WHERE key='hadith_total'")
     db.commit()
 
