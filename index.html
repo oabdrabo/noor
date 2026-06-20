@@ -342,7 +342,7 @@
       <template v-if="mode==='qa' && qaAnswer">
         <div class="qa" v-if="qaAnswer.answer">
           <div class="qa-label">Answer · grounded in {{qaAnswer.citations?.length||0}} sources</div>
-          <div class="qa-body">{{qaAnswer.answer}}</div>
+          <div class="qa-body" v-html="mdLite(qaAnswer.answer)"></div>
         </div>
         <div class="sources-label" v-if="qaAnswer.citations?.length">Sources</div>
         <div class="card" v-for="(r,i) in qaAnswer.citations" :key="i" :style="{animationDelay:i*50+'ms'}">
@@ -526,6 +526,12 @@ createApp({
     function pct(s){return s!=null?Math.round(s*100)+'%':''}
     function fmt(n){return n!=null?Number(n).toLocaleString():'0'}
     function scoreClass(s){return s>0.75?'s-high':s>0.5?'s-med':'s-low'}
+    function mdLite(t){
+      const e=String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      return e.replace(/^#{1,6}\s*(.+)$/gm,'<strong>$1</strong>')
+        .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+        .replace(/\*([^*\n]+)\*/g,'<em>$1</em>')
+    }
     function distPct(val){
       if(!distribution.value)return 0
       const max=Math.max(...Object.values(distribution.value))
@@ -696,7 +702,7 @@ createApp({
       query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
       stats,toast,searched,suggestions,searchInput,surahFilter,showBookmarks,bookmarks,
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
-      dark,toggleTheme,isArabic,pct,fmt,scoreClass,distPct,distColor,
+      dark,toggleTheme,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
       switchMode,search,loadSurah,copy,shareVerse,toggleMic,recording,
       isBookmarked,toggleBookmark,removeBookmark,showToast
     }

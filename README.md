@@ -6,6 +6,15 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 
 **Try it: [noor.pyxis3.ai](https://noor.pyxis3.ai)** — type a question in Arabic or English ("verses about patience in adversity", "حديث عن حقوق الجار") and get matches by meaning, not keyword.
 
+<p align="center">
+  <img src="docs/screenshot-light.png" alt="Noor — search, light" width="49%">
+  <img src="docs/screenshot-dark.png" alt="Noor — search, dark" width="49%">
+</p>
+
+**Grounded Q&A** — a real answer synthesised from the retrieved verses and hadith, every claim cited inline:
+
+<p align="center"><img src="docs/screenshot-qa.png" alt="Noor — grounded Q&A with citations" width="80%"></p>
+
 ## What it does
 
 - **Semantic search** in either Arabic or English; returns top matches across the Quran + major Hadith collections
@@ -15,7 +24,7 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 - **Vector store** backed by `sqlite-vec` — embeddings live in a single SQLite file, no separate DB to operate
 - **TF-IDF + KMeans clustering** for topic discovery and concept maps
 - **Word-cloud generation** over the corpus
-- FastAPI backend, single-page Vue 3 frontend, nginx in front
+- **Light & dark**, Arabic-first single-file Vue 3 frontend · FastAPI backend · nginx edge
 
 ## Stack
 
