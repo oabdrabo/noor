@@ -30,7 +30,7 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 
 | Layer | Choice | Why |
 |---|---|---|
-| Embeddings | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384-dim) | Strong multilingual baseline; small enough to run on CPU |
+| Embeddings | `intfloat/multilingual-e5-small` (384-dim) | Strong multilingual baseline; small enough to run on CPU |
 | Vector store | `sqlite-vec` | Zero-ops, file-backed, deployable on any host |
 | API | FastAPI + Pydantic v2 | Async + automatic schema |
 | Frontend | Vue 3 via CDN (no build step) | One HTML file, fastest possible iteration |
