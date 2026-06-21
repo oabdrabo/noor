@@ -378,11 +378,16 @@ async def lifespan(app: FastAPI):
     s.cache = {}
 
     def _warm_and_index(state, ev):
-        try:
-            state.embed("نور")  # warm the model so the first real query is sub-second
-        except Exception:
-            logger.exception("embed warm-up failed")
         _index_all(state, ev)
+        try:
+            # Full warm-up (embed model + sqlite-vec index) — warming the model alone
+            # still left the first vector MATCH cold (~6s). Run one real search.
+            _vec_search(
+                state.db, "quran_vec", "quran_metadata", "verse_id", QURAN_COLS,
+                state.embed("نور"), 1,
+            )
+        except Exception:
+            logger.exception("search warm-up failed")
 
     stop = threading.Event()
     thread = threading.Thread(target=_warm_and_index, args=(s, stop), daemon=True)
