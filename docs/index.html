@@ -196,7 +196,7 @@
     if (/app\.noor/i.test(h))            { ev('launch');  conv('launch'); }
     else if (/buy\.stripe/i.test(h))     { ev('sponsor'); conv('sponsor'); }
     else if (/donate\.stripe/i.test(h))  { ev('donate');  conv('donate'); }
-    else if (/github\.com/i.test(h))       ev('source');
+    else if (/github\.com/i.test(h))       ev('github');
     else if (/^#/.test(h))                 ev('nav');
     else if (/pyxis3\.ai/i.test(h))        ev('pyxis3');
     else                                   ev('click');
