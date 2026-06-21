@@ -377,8 +377,15 @@ async def lifespan(app: FastAPI):
     s.index_progress = "Starting"
     s.cache = {}
 
+    def _warm_and_index(state, ev):
+        try:
+            state.embed("نور")  # warm the model so the first real query is sub-second
+        except Exception:
+            logger.exception("embed warm-up failed")
+        _index_all(state, ev)
+
     stop = threading.Event()
-    thread = threading.Thread(target=_index_all, args=(s, stop), daemon=True)
+    thread = threading.Thread(target=_warm_and_index, args=(s, stop), daemon=True)
     thread.start()
     logger.info("API ready, indexing in background")
 
