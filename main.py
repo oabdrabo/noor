@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 import threading
+import time
 import urllib.error
 import urllib.request
 from collections import Counter
@@ -39,6 +40,30 @@ AIGW_TIMEOUT = 120
 
 STT_URL = os.environ.get("STT_URL", "http://stt.stt.svc.cluster.local:8000")
 STT_MODEL = os.environ.get("STT_MODEL", "Systran/faster-whisper-small")
+
+# In-memory per-IP rate limit for the expensive public endpoints (embeddings, Claude,
+# STT) — an unauthenticated flood would otherwise be a cost + resource DoS.
+_RL: dict[str, tuple[int, float]] = {}
+
+
+def _rate_limit(request: Request, limit: int, window: float = 60.0) -> None:
+    ip = (
+        request.headers.get("x-real-ip")
+        or request.headers.get("x-forwarded-for", "").split(",")[0]
+        or (request.client.host if request.client else "?")
+    ).strip()
+    now = time.monotonic()
+    if len(_RL) > 10000:  # bound memory: drop windows that have elapsed
+        for k in [k for k, (_, r) in _RL.items() if now > r]:
+            del _RL[k]
+    count, reset = _RL.get(ip, (0, now + window))
+    if now > reset:
+        count, reset = 0, now + window
+    count += 1
+    _RL[ip] = (count, reset)
+    if count > limit:
+        raise HTTPException(status_code=429, detail="Too many requests — slow down.")
+
 
 COL_SURAH = "surah_no"
 COL_AYAH = "ayah_no_surah"
@@ -119,8 +144,8 @@ class QAQuery(BaseModel):
 
 
 class TranscribeQuery(BaseModel):
-    audio: str
-    content_type: str = "audio/webm"
+    audio: str = Field(..., max_length=2_700_000)  # ~2 MB base64; matches nginx body cap
+    content_type: str = Field("audio/webm", max_length=80, pattern=r"^[\w.+-]+/[\w.+-]+$")
 
 
 def _connect():
@@ -452,6 +477,7 @@ def stats(request: Request):
 
 @app.post("/api/search")
 def search_verses(query: SearchQuery, request: Request):
+    _rate_limit(request, 60)
     s = request.app.state
     if not s.quran_ready:
         return _indexing(s.index_progress)
@@ -502,6 +528,7 @@ def search_verses(query: SearchQuery, request: Request):
 
 @app.post("/api/hadith/search")
 def search_hadith(query: SearchQuery, request: Request):
+    _rate_limit(request, 60)
     s = request.app.state
     if not s.hadith_ready:
         return _indexing(s.index_progress)
@@ -523,6 +550,7 @@ def search_hadith(query: SearchQuery, request: Request):
 
 @app.post("/api/qa")
 def qa(query: QAQuery, request: Request):
+    _rate_limit(request, 20)
     s = request.app.state
     if not s.quran_ready:
         return {
@@ -573,7 +601,8 @@ def qa(query: QAQuery, request: Request):
 
 
 @app.post("/api/transcribe")
-def transcribe(query: TranscribeQuery):
+def transcribe(query: TranscribeQuery, request: Request):
+    _rate_limit(request, 15)
     try:
         audio = base64.b64decode(query.audio, validate=True)
     except ValueError:
