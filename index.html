@@ -839,10 +839,37 @@ createApp({
       navigator.clipboard.writeText(`${ref}\n${t}`).then(()=>showToast('Copied'))
     }
     function shareVerse(r){
+      if(r.surah){shareImage(r);return}
       const text=r.translation||r.text||''
-      const ref=r.surah?`Quran ${surahName(r.surah)?surahName(r.surah)+' ':''}${r.surah}:${r.ayah}`:(r.collection?`${r.collection} #${r.hadith_number}`:'')
+      const ref=r.collection?`${r.collection} #${r.hadith_number}`:''
       if(navigator.share)navigator.share({title:'Noor',text:`${ref}\n${text}`}).catch(()=>{})
       else copy(r)
+    }
+    function _wrap(ctx,text,maxW){
+      const words=String(text||'').split(' '),lines=[];let line=''
+      for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w}else line=t}
+      if(line)lines.push(line);return lines
+    }
+    async function shareImage(r){
+      try{
+        const dk=document.documentElement.dataset.theme==='dark'
+        try{await document.fonts.load('700 54px Amiri');await document.fonts.load('400 34px Inter')}catch(e){}
+        const W=1080,P=100,c=document.createElement('canvas');c.width=W;c.height=W;const x=c.getContext('2d')
+        x.fillStyle=dk?'#14120c':'#f6f1e7';x.fillRect(0,0,W,W)
+        x.strokeStyle=dk?'rgba(217,181,107,.4)':'rgba(160,125,44,.4)';x.lineWidth=3;x.strokeRect(30,30,W-60,W-60)
+        x.textAlign='center';x.fillStyle=dk?'#d9b56b':'#a07d2c';x.font='600 34px Inter'
+        x.fillText((surahName(r.surah)?surahName(r.surah)+' ':'')+r.surah+':'+r.ayah,W/2,140)
+        x.fillStyle=dk?'#ece4d3':'#2a251d';x.direction='rtl';x.font='700 54px Amiri'
+        let y=300;_wrap(x,r.text,W-2*P).forEach(l=>{x.fillText(l,W/2,y);y+=84})
+        x.direction='ltr';x.fillStyle=dk?'#b3a892':'#6f6657';x.font='400 34px Inter';y+=46
+        _wrap(x,r.translation,W-2*P).forEach(l=>{x.fillText(l,W/2,y);y+=50})
+        x.fillStyle=dk?'#d9b56b':'#a07d2c';x.font='700 44px Amiri';x.fillText('نور · Noor',W/2,W-72)
+        c.toBlob(b=>{
+          const f=new File([b],'noor-verse.png',{type:'image/png'})
+          if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'Noor'}).catch(()=>{})
+          else{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='noor-verse.png';a.click();showToast('Image saved')}
+        })
+      }catch(e){showToast('Could not create image')}
     }
 
     function showToast(msg){toast.value=msg;setTimeout(()=>toast.value='',2000)}
