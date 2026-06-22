@@ -835,12 +835,12 @@ createApp({
 
     function copy(r){
       const t=r.translation||r.text||''
-      const ref=r.surah?`${r.surah}:${r.ayah}`:(r.collection?`${r.collection} #${r.hadith_number}`:'')
+      const ref=r.surah?`${surahName(r.surah)?surahName(r.surah)+' ':''}${r.surah}:${r.ayah}`:(r.collection?`${r.collection} #${r.hadith_number}`:'')
       navigator.clipboard.writeText(`${ref}\n${t}`).then(()=>showToast('Copied'))
     }
     function shareVerse(r){
       const text=r.translation||r.text||''
-      const ref=r.surah?`Quran ${r.surah}:${r.ayah}`:(r.collection?`${r.collection} #${r.hadith_number}`:'')
+      const ref=r.surah?`Quran ${surahName(r.surah)?surahName(r.surah)+' ':''}${r.surah}:${r.ayah}`:(r.collection?`${r.collection} #${r.hadith_number}`:'')
       if(navigator.share)navigator.share({title:'Noor',text:`${ref}\n${text}`}).catch(()=>{})
       else copy(r)
     }
