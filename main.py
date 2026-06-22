@@ -26,7 +26,7 @@ logger = logging.getLogger("noor")
 
 MODEL_NAME = "intfloat/multilingual-e5-small"
 EMBED_DIM = 384
-QURAN_INDEX_VERSION = "2-bilingual-ar-en"
+QURAN_INDEX_VERSION = "3-uthmani-canonical"
 BATCH = 64
 
 DATA_DIR = os.environ.get("NOOR_DATA_DIR", "/config")
@@ -251,7 +251,7 @@ def _index_quran(state, stop):
     surah = df[COL_SURAH].to_numpy()
     ayah = df[COL_AYAH].to_numpy()
     uth = _data_file("quran-uthmani.json")
-    ar = np.array([uth.get(f"{int(surah[j])}:{int(ayah[j])}", ar[j]) for j in range(total)], dtype=object)
+    ar = np.array([uth[f"{int(surah[j])}:{int(ayah[j])}"] for j in range(total)], dtype=object)
     texts = [f"passage: {a} {e}" for a, e in zip(ar, en)]
 
     def persist(i, embeddings):
@@ -351,24 +351,11 @@ def _data_file(name):
         return json.load(f)
 
 
-def _canonicalize_quran_text(db):
-    sample = db.execute("SELECT text FROM quran_metadata WHERE surah=1 AND ayah=1").fetchone()
-    if not sample or "ۡ" not in (sample[0] or ""):
-        return
-    uth = _data_file("quran-uthmani.json")
-    rows = db.execute("SELECT verse_id, surah, ayah FROM quran_metadata").fetchall()
-    updates = [(uth[k], vid) for vid, s, a in rows if (k := f"{s}:{a}") in uth]
-    db.executemany("UPDATE quran_metadata SET text=? WHERE verse_id=?", updates)
-    db.commit()
-    logger.info("Canonicalized %d Quran verses to Uthmani", len(updates))
-
-
 def _index_all(state, stop):
     try:
         _index_quran(state, stop)
         if stop.is_set():
             return
-        _canonicalize_quran_text(state.db)
         _index_hadith(state, stop)
         if not stop.is_set():
             state.index_progress = "Ready"
@@ -396,13 +383,9 @@ async def lifespan(app: FastAPI):
     _ensure_model(db)
 
     df = pd.read_csv(CSV_PATH)
-    df[COL_AR] = df[COL_AR].fillna("")
     df[COL_EN] = df[COL_EN].fillna("")
     uth = _data_file("quran-uthmani.json")
-    df[COL_AR] = [
-        uth.get(f"{int(sv)}:{int(av)}", tv)
-        for sv, av, tv in zip(df[COL_SURAH], df[COL_AYAH], df[COL_AR])
-    ]
+    df[COL_AR] = [uth[f"{int(sv)}:{int(av)}"] for sv, av in zip(df[COL_SURAH], df[COL_AYAH])]
     logger.info("%d verses loaded", len(df))
 
     @lru_cache(maxsize=2048)
