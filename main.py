@@ -146,6 +146,7 @@ class CountQuery(BaseModel):
 class QAQuery(BaseModel):
     question: str
     limit: int = Field(5, ge=1, le=10)
+    online: bool = False
 
 
 class TranscribeQuery(BaseModel):
@@ -583,6 +584,21 @@ def search_hadith(query: SearchQuery, request: Request):
     return {"results": results, "total": len(results)}
 
 
+TAFSIR_ID = 169  # Tafsir Ibn Kathir (Abridged), via the Quran.com public API
+
+
+def _fetch_tafsir(verse_key):
+    """Fetch classical tafsir for a verse from Quran.com, HTML-stripped and truncated. Best-effort."""
+    try:
+        url = f"https://api.quran.com/api/v4/tafsirs/{TAFSIR_ID}/by_ayah/{verse_key}"
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            raw = json.loads(resp.read()).get("tafsir", {}).get("text", "") or ""
+        return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw)).strip()[:1400]
+    except Exception as e:
+        logger.error("tafsir fetch failed for %s: %s", verse_key, e)
+        return ""
+
+
 @app.post("/api/qa")
 def qa(query: QAQuery, request: Request):
     _rate_limit(request, 20)
@@ -625,14 +641,22 @@ def qa(query: QAQuery, request: Request):
             "answer": "No relevant passages were found for that question.",
             "citations": [],
         }
+    context = _format_context(verses, hadith)
+    online = None
+    if query.online and verses:
+        vk = f"{verses[0]['surah']}:{verses[0]['ayah']}"
+        tafsir = _fetch_tafsir(vk)
+        if tafsir:
+            context += (
+                f"\n\nClassical commentary (Tafsir Ibn Kathir, retrieved online from Quran.com) "
+                f"on {vk}:\n{tafsir}"
+            )
+            online = {"label": "Tafsir Ibn Kathir", "via": "Quran.com", "verse": vk}
     messages = [
         {"role": "system", "content": QA_SYSTEM},
-        {
-            "role": "user",
-            "content": f"Question: {q}\n\nPassages:\n{_format_context(verses, hadith)}",
-        },
+        {"role": "user", "content": f"Question: {q}\n\nPassages:\n{context}"},
     ]
-    return {"answer": _aigw_chat(messages), "citations": verses + hadith}
+    return {"answer": _aigw_chat(messages), "citations": verses + hadith, "online": online}
 
 
 @app.post("/api/transcribe")

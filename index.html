@@ -314,6 +314,12 @@
       </div>
     </div>
 
+    <div v-if="mode==='qa'" style="margin:-6px 0 16px;font-size:13px;color:var(--ink-3)">
+      <label style="display:inline-flex;align-items:center;gap:7px;cursor:pointer">
+        <input type="checkbox" v-model="onlineSearch" style="accent-color:var(--gold);width:15px;height:15px">
+        {{ar?'بحث على الإنترنت · تفسير ابن كثير (Quran.com)':'Search online · Ibn Kathir tafsir (Quran.com)'}}
+      </label>
+    </div>
     <div class="filters" v-if="mode==='search' && searched">
       <select class="filter-select" v-model.number="surahFilter" @change="search()">
         <option :value="0">{{tr.allSurahs}}</option>
@@ -343,7 +349,7 @@
       <!-- Q&A -->
       <template v-if="mode==='qa' && qaAnswer">
         <div class="qa" v-if="qaAnswer.answer">
-          <div class="qa-label">{{tr.answer}} · {{tr.groundedIn}} {{qaAnswer.citations?.length||0}} {{tr.sources}}</div>
+          <div class="qa-label">{{tr.answer}} · {{tr.groundedIn}} {{qaAnswer.citations?.length||0}} {{tr.sources}}<span v-if="qaAnswer.online" style="margin-inline-start:8px;color:var(--gold)">· {{ar?'تفسير':'+'}} {{qaAnswer.online.label}} ({{qaAnswer.online.via}})</span></div>
           <div class="qa-body" v-html="mdLite(qaAnswer.answer)"></div>
         </div>
         <div class="sources-label" v-if="qaAnswer.citations?.length">{{tr.sourcesH}}</div>
@@ -490,6 +496,7 @@ createApp({
     const searchInput=ref(null)
     const recording=ref(false)
     const surahFilter=ref(0)
+    const onlineSearch=ref(false)
     const showBookmarks=ref(false)
     const bookmarks=ref(JSON.parse(localStorage.getItem('noor-bookmarks')||'[]'))
     const analyticsData=ref(null)
@@ -616,7 +623,7 @@ createApp({
             results.value=data.results||[]
             break
           case 'qa':
-            data=await post(`${API}/qa`,{question:q})
+            data=await post(`${API}/qa`,{question:q,online:onlineSearch.value})
             if(data.indexing){error.value=`Building search index… (${data.progress||'please wait'})`;break}
             qaAnswer.value=data
             break
@@ -716,7 +723,7 @@ createApp({
 
     return{
       query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
-      stats,toast,searched,suggestions,searchInput,surahFilter,showBookmarks,bookmarks,
+      stats,toast,searched,suggestions,searchInput,surahFilter,onlineSearch,showBookmarks,bookmarks,
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
       dark,toggleTheme,lang,ar,tr,toggleLang,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
       switchMode,search,loadSurah,copy,shareVerse,toggleMic,recording,
