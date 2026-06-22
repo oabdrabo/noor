@@ -702,6 +702,39 @@ def count_word(query: CountQuery, request: Request):
     }
 
 
+@app.get("/api/related/{surah}/{ayah}")
+def related(surah: int, ayah: int, request: Request, limit: int = 6):
+    """Verses semantically nearest to a given verse, using its own stored embedding."""
+    _rate_limit(request, 30)
+    s = request.app.state
+    if not s.quran_ready:
+        return {"results": [], "indexing": True, "progress": s.index_progress}
+    db = s.db
+    row = db.execute(
+        "SELECT verse_id FROM quran_metadata WHERE surah=? AND ayah=?", [surah, ayah]
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Verse not found")
+    vid = row[0]
+    emb = db.execute("SELECT embedding FROM quran_vec WHERE rowid=?", [vid]).fetchone()
+    if not emb:
+        return {"results": []}
+    hits = db.execute(
+        "SELECT rowid, distance FROM quran_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
+        [emb[0], limit + 1],
+    ).fetchall()
+    score = {h[0]: max(0.0, 1.0 - h[1]) for h in hits}
+    ids = [h[0] for h in hits if h[0] != vid][:limit]
+    if not ids:
+        return {"results": []}
+    ph = ",".join("?" * len(ids))
+    rows = db.execute(
+        f"SELECT verse_id,{','.join(QURAN_COLS)} FROM quran_metadata WHERE verse_id IN ({ph})", ids
+    ).fetchall()
+    meta = {r[0]: r[1:] for r in rows}
+    return {"results": [dict(zip(QURAN_COLS, meta[i]), score=score[i]) for i in ids if i in meta]}
+
+
 @app.get("/api/analytics/surah")
 def surah_analytics(request: Request):
     df = request.app.state.df_verses
