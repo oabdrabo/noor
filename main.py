@@ -758,6 +758,13 @@ def words(surah: int, ayah: int, request: Request):
         return {"words": []}
 
 
+@app.get("/api/tafsir/{surah}/{ayah}")
+def tafsir(surah: int, ayah: int, request: Request):
+    """Classical tafsir (Ibn Kathir) for a verse, for inline display in the card. Best-effort."""
+    _rate_limit(request, 40)
+    return {"tafsir": _fetch_tafsir(f"{surah}:{ayah}")}
+
+
 @app.get("/api/analytics/surah")
 def surah_analytics(request: Request):
     df = request.app.state.df_verses

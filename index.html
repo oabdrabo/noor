@@ -256,6 +256,16 @@
     .wbw-w{display:flex;flex-direction:column;align-items:center;background:var(--surface);border:1px solid var(--gold-line);border-radius:9px;padding:6px 11px;min-width:46px}
     .wbw-ar{font-family:var(--ar);font-size:20px;line-height:1.5;color:var(--ink)}
     .wbw-en{font-size:10.5px;color:var(--ink-3);margin-top:2px;direction:ltr;text-align:center}
+    .inline-sec{margin:12px 0;padding:12px 14px;background:var(--gold-tint);border:1px solid var(--gold-line);border-radius:11px}
+    .inline-label{font-family:var(--ui);font-size:10.5px;color:var(--gold);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:8px}
+    .inline-body{font-size:14px;line-height:1.85;color:var(--ink)}
+    .inline-loading{display:flex;justify-content:center;padding:6px}
+    .rel-v{padding:7px 0;border-top:1px solid var(--gold-line);cursor:pointer;font-size:13.5px;color:var(--ink-3);transition:color .15s}
+    .rel-v:first-of-type{border-top:none}
+    .rel-v:hover{color:var(--gold)}
+    .rel-v strong{color:var(--gold);margin-inline-end:8px}
+    .act.ico{padding:8px;min-width:0}
+    .act.ico.on{background:var(--gold-tint);border-color:var(--gold-line);color:var(--gold)}
   </style>
 </head>
 <body>
@@ -360,16 +370,7 @@
           <div class="qa-body" v-html="mdLite(qaAnswer.answer)"></div>
         </div>
         <div class="sources-label" v-if="qaAnswer.citations?.length">{{tr.sourcesH}}</div>
-        <div class="card" v-for="(r,i) in qaAnswer.citations" :key="i" :style="{animationDelay:i*50+'ms'}">
-          <div class="card-head">
-            <span class="ref" v-if="r.surah">{{r.surah}}:{{r.ayah}}</span>
-            <span class="ref" v-else-if="r.collection"><span class="collection">{{r.collection}}</span> #{{r.hadith_number}}</span>
-            <span class="score" :class="scoreClass(r.score)" v-if="r.score">{{pct(r.score)}}</span>
-          </div>
-          <div class="arabic" v-if="r.text && isArabic(r.text)">{{r.text}}</div>
-          <div class="hadith-text" v-else-if="r.text">{{r.text}}</div>
-          <div class="translation" v-if="r.translation">{{r.translation}}</div>
-        </div>
+        <verse-card v-for="(r,i) in qaAnswer.citations" :key="i" :v="r" :idx="i"></verse-card>
       </template>
 
       <!-- Count -->
@@ -378,13 +379,7 @@
           <div class="n">{{fmt(countResult.count)}}</div>
           <div class="l">&ldquo;{{countResult.word}}&rdquo; {{tr.appearsIn}} {{fmt(countResult.total_verses_with_word)}} {{tr.inVerses}}</div>
         </div>
-        <div class="card" v-for="(e,i) in countResult.examples" :key="i" :style="{animationDelay:i*40+'ms'}">
-          <div class="card-head">
-            <span class="ref">{{e.surah}}:{{e.ayah}}</span>
-            <span class="score s-high">{{e.matches}}&times;</span>
-          </div>
-          <div class="translation">{{e.text}}</div>
-        </div>
+        <verse-card v-for="(e,i) in countResult.examples" :key="i" :v="{surah:e.surah,ayah:e.ayah,translation:e.text}" :idx="i"></verse-card>
       </template>
 
       <!-- Themes -->
@@ -435,45 +430,14 @@
             <span style="font-size:12px;color:var(--ink-3)">{{tr.surah}} {{browseSurah}} · {{browseSurahData?.total_verses}} {{tr.verses}}</span>
           </div>
           <div class="results">
-            <div class="card" v-for="v in browseSurahData?.verses||[]" :key="v.ayah" :style="{animationDelay:Math.min(v.ayah*18,300)+'ms'}">
-              <div class="card-head"><span class="ref">{{browseSurah}}:{{v.ayah}}</span></div>
-              <div class="arabic" v-if="v.text">{{v.text}}</div>
-              <div class="translation" v-if="v.translation">{{v.translation}}</div>
-              <div class="actions">
-                <button class="act" @click="playAudio(browseSurah,v.ayah)"><svg viewBox="0 0 24 24"><path v-if="playingVerse===browseSurah+':'+v.ayah" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg> {{tr.listen}}</button>
-                <button class="act" @click="copy({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> {{tr.copy}}</button>
-                <button class="act" :class="{on:isBookmarked({surah:browseSurah,ayah:v.ayah})}" @click="toggleBookmark({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{tr.save}}</button>
-                <button class="act" @click="showRelated(browseSurah,v.ayah)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> {{tr.similar}}</button>
-                <button class="act" @click="shareVerse({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> {{tr.share}}</button>
-              </div>
-            </div>
+            <verse-card v-for="bv in browseSurahData?.verses||[]" :key="bv.ayah" :v="{surah:browseSurah,ayah:bv.ayah,text:bv.text,translation:bv.translation}"></verse-card>
           </div>
         </div>
       </template>
 
       <!-- Search / Hadith -->
       <template v-else>
-        <div class="card" v-for="(r,i) in results" :key="i" :style="{animationDelay:i*40+'ms'}">
-          <div class="card-head">
-            <span class="ref" v-if="r.surah">{{r.surah}}:{{r.ayah}}</span>
-            <span class="ref" v-else-if="r.collection"><span class="collection">{{r.collection}}</span> #{{r.hadith_number}}</span>
-            <span class="score" :class="scoreClass(r.score)" v-if="r.score">{{pct(r.score)}}</span>
-          </div>
-          <div class="arabic" v-if="r.text && isArabic(r.text)">{{r.text}}</div>
-          <div class="hadith-text" v-else-if="r.text">{{r.text}}</div>
-          <div class="translation" v-if="r.translation">{{r.translation}}</div>
-          <div class="wbw" v-if="verseWords[r.surah+':'+r.ayah]?.length">
-            <span class="wbw-w" v-for="(w,wi) in verseWords[r.surah+':'+r.ayah]" :key="wi"><span class="wbw-ar">{{w.ar}}</span><span class="wbw-en">{{w.en}}</span></span>
-          </div>
-          <div class="actions">
-            <button class="act" v-if="r.surah" @click="playAudio(r.surah,r.ayah)"><svg viewBox="0 0 24 24"><path v-if="playingVerse===r.surah+':'+r.ayah" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg> {{tr.listen}}</button>
-            <button class="act" v-if="r.surah" @click="showWords(r.surah,r.ayah)"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg> {{tr.words}}</button>
-            <button class="act" @click="copy(r)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> {{tr.copy}}</button>
-            <button class="act" :class="{on:isBookmarked(r)}" v-if="r.surah" @click="toggleBookmark(r)"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{isBookmarked(r)?tr.saved:tr.save}}</button>
-            <button class="act" v-if="r.surah" @click="showRelated(r.surah,r.ayah)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> {{tr.similar}}</button>
-            <button class="act" @click="shareVerse(r)"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> {{tr.share}}</button>
-          </div>
-        </div>
+        <verse-card v-for="(r,i) in results" :key="i" :v="r" :idx="i"></verse-card>
       </template>
 
       <div class="empty" v-if="!results.length && !qaAnswer && !countResult && !themes && searched && mode!=='analytics' && mode!=='browse'">
@@ -490,7 +454,46 @@
 </div>
 
 <script>
-const{createApp,ref,computed,onMounted,onUnmounted,nextTick}=Vue
+const{createApp,ref,computed,onMounted,onUnmounted,nextTick,provide,inject}=Vue
+
+const VerseCard={
+  props:{v:Object,idx:{type:Number,default:0}},
+  setup(){return{...inject('ctx')}},
+  template:`
+  <div class="card" :style="{animationDelay:idx*40+'ms'}">
+    <div class="card-head">
+      <span class="ref" v-if="v.surah">{{v.surah}}:{{v.ayah}}</span>
+      <span class="ref" v-else-if="v.collection"><span class="collection">{{v.collection}}</span> #{{v.hadith_number}}</span>
+      <span class="score" :class="scoreClass(v.score)" v-if="v.score">{{pct(v.score)}}</span>
+    </div>
+    <div class="arabic" v-if="v.text && isArabic(v.text)">{{v.text}}</div>
+    <div class="hadith-text" v-else-if="v.text">{{v.text}}</div>
+    <div class="translation" v-if="v.translation">{{v.translation}}</div>
+    <div class="wbw" v-if="v.surah && verseWords[v.surah+':'+v.ayah]?.length">
+      <span class="wbw-w" v-for="(w,wi) in verseWords[v.surah+':'+v.ayah]" :key="wi"><span class="wbw-ar">{{w.ar}}</span><span class="wbw-en">{{w.en}}</span></span>
+    </div>
+    <div class="inline-sec" v-if="v.surah && verseTafsir[v.surah+':'+v.ayah]!==undefined">
+      <div class="inline-label">{{tr.tafsir}} · Ibn Kathir</div>
+      <div v-if="verseTafsir[v.surah+':'+v.ayah]" class="inline-body">{{verseTafsir[v.surah+':'+v.ayah]}}</div>
+      <div v-else class="inline-loading"><span class="spinner"></span></div>
+    </div>
+    <div class="inline-sec" v-if="v.surah && verseRelated[v.surah+':'+v.ayah]?.length">
+      <div class="inline-label">{{tr.relatedH}}</div>
+      <div class="rel-v" v-for="(rv,ri) in verseRelated[v.surah+':'+v.ayah]" :key="ri" @click="goVerse(rv)">
+        <strong>{{rv.surah}}:{{rv.ayah}}</strong> <span>{{(rv.translation||'').slice(0,72)}}&hellip;</span>
+      </div>
+    </div>
+    <div class="actions" v-if="v.surah">
+      <button class="act ico" @click="playAudio(v.surah,v.ayah)" :title="tr.listen"><svg viewBox="0 0 24 24"><path v-if="playingVerse===v.surah+':'+v.ayah" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg></button>
+      <button class="act ico" :class="{on:verseWords[v.surah+':'+v.ayah]}" @click="showWords(v.surah,v.ayah)" :title="tr.words"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></button>
+      <button class="act ico" :class="{on:verseRelated[v.surah+':'+v.ayah]}" @click="toggleRelated(v.surah,v.ayah)" :title="tr.relatedH"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+      <button class="act ico" :class="{on:verseTafsir[v.surah+':'+v.ayah]!==undefined}" @click="toggleTafsir(v.surah,v.ayah)" :title="tr.tafsir"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></button>
+      <button class="act ico" @click="copy(v)" :title="tr.copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+      <button class="act ico" :class="{on:isBookmarked(v)}" @click="toggleBookmark(v)" :title="isBookmarked(v)?tr.saved:tr.save"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></button>
+      <button class="act ico" @click="shareVerse(v)" :title="tr.share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></button>
+    </div>
+  </div>`
+}
 
 createApp({
   setup(){
@@ -523,8 +526,8 @@ createApp({
     const lang=ref(localStorage.getItem('noor-lang')||'en')
     const ar=computed(()=>lang.value==='ar')
     const STR={
-      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',copy:'Copy',save:'Save',saved:'Saved',similar:'Similar',share:'Share',allSurahsBtn:'All surahs',switchLang:'العربية'},
-      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',copy:'نسخ',save:'حفظ',saved:'محفوظ',similar:'مشابه',share:'مشاركة',allSurahsBtn:'كل السور',switchLang:'English'},
+      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',similar:'Similar',share:'Share',allSurahsBtn:'All surahs',switchLang:'العربية'},
+      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',similar:'مشابه',share:'مشاركة',allSurahsBtn:'كل السور',switchLang:'English'},
     }
     const tr=computed(()=>STR[lang.value])
 
@@ -630,6 +633,27 @@ createApp({
         verseWords.value={...verseWords.value,[key]:d.words}
       }catch(e){showToast('Word-by-word unavailable')}
     }
+
+    const verseRelated=ref({}), verseTafsir=ref({})
+    async function toggleRelated(surah,ayah){
+      const key=surah+':'+ayah
+      if(verseRelated.value[key]){const c={...verseRelated.value};delete c[key];verseRelated.value=c;return}
+      try{
+        const d=await fetch(`${API}/related/${surah}/${ayah}?limit=5`).then(r=>r.json())
+        verseRelated.value={...verseRelated.value,[key]:d.results||[]}
+      }catch(e){showToast('Unavailable')}
+    }
+    async function toggleTafsir(surah,ayah){
+      const key=surah+':'+ayah
+      if(verseTafsir.value[key]!==undefined){const c={...verseTafsir.value};delete c[key];verseTafsir.value=c;return}
+      verseTafsir.value={...verseTafsir.value,[key]:''}
+      try{
+        const d=await fetch(`${API}/tafsir/${surah}/${ayah}`).then(r=>r.json())
+        if(!d.tafsir){const c={...verseTafsir.value};delete c[key];verseTafsir.value=c;showToast('Tafsir unavailable');return}
+        verseTafsir.value={...verseTafsir.value,[key]:d.tafsir}
+      }catch(e){const c={...verseTafsir.value};delete c[key];verseTafsir.value=c;showToast('Tafsir unavailable')}
+    }
+    function goVerse(rv){query.value=rv.surah+':'+rv.ayah;mode.value='search';search()}
 
     function switchMode(m){
       mode.value=m.id
@@ -785,6 +809,8 @@ createApp({
     })
     onUnmounted(()=>document.removeEventListener('keydown',onKeydown))
 
+    provide('ctx',{tr,ar,isArabic,pct,scoreClass,playingVerse,playAudio,verseWords,showWords,verseRelated,toggleRelated,verseTafsir,toggleTafsir,goVerse,copy,shareVerse,isBookmarked,toggleBookmark})
+
     return{
       query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
       stats,toast,searched,suggestions,chips,searchInput,surahFilter,onlineSearch,playingVerse,playAudio,showBookmarks,bookmarks,
@@ -794,7 +820,7 @@ createApp({
       isBookmarked,toggleBookmark,removeBookmark,saveBookmarks,showToast
     }
   }
-}).mount('#app')
+}).component('verse-card',VerseCard).mount('#app')
 </script>
 </body>
 </html>
