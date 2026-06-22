@@ -26,6 +26,8 @@ logger = logging.getLogger("noor")
 
 MODEL_NAME = "intfloat/multilingual-e5-small"
 EMBED_DIM = 384
+# Bump to force a Quran re-index when the embedding strategy changes (independent of MODEL_NAME).
+QURAN_INDEX_VERSION = "2-bilingual-ar-en"
 BATCH = 64
 
 DATA_DIR = os.environ.get("NOOR_DATA_DIR", "/config")
@@ -225,6 +227,21 @@ def _index_quran(state, stop):
     db = state.db
     df = state.df_verses
     total = len(df)
+    # Rebuild when the embedding strategy changes (e.g. en-only -> bilingual ar+en), not only on
+    # a model swap. A version mismatch wipes the Quran index alone; hadith is left untouched.
+    ver = db.execute("SELECT value FROM meta WHERE key='quran_index_version'").fetchone()
+    if ver is None or ver[0] != QURAN_INDEX_VERSION:
+        logger.info("Quran embedding strategy changed -> rebuilding index")
+        db.execute("DROP TABLE IF EXISTS quran_vec")
+        db.execute(
+            f"CREATE VIRTUAL TABLE quran_vec USING vec0(embedding float[{EMBED_DIM}] distance_metric=cosine)"
+        )
+        db.execute("DELETE FROM quran_metadata")
+        db.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('quran_index_version', ?)",
+            [QURAN_INDEX_VERSION],
+        )
+        db.commit()
     start = db.execute("SELECT COUNT(*) FROM quran_vec").fetchone()[0]
     if start >= total:
         state.quran_ready = True
@@ -234,7 +251,10 @@ def _index_quran(state, stop):
     en = df[COL_EN].astype(str).to_numpy()
     surah = df[COL_SURAH].to_numpy()
     ayah = df[COL_AYAH].to_numpy()
-    texts = [f"passage: {e}" for e in en]
+    # Embed each verse's Arabic together with its English translation so BOTH Arabic and English
+    # queries match natively. The small multilingual model's cross-lingual matching is weak, so
+    # en-only passages made Arabic queries (the Quran's primary language) underperform badly.
+    texts = [f"passage: {a} {e}" for a, e in zip(ar, en)]
 
     def persist(i, embeddings):
         rows = range(i, min(i + BATCH, total))
