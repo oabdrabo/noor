@@ -285,14 +285,17 @@
     <div class="bm" v-if="showBookmarks">
       <h3><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{tr.bookmarks}} ({{bookmarks.length}})</h3>
       <div v-if="bookmarks.length">
-        <div class="bm-item" v-for="(b,i) in bookmarks" :key="b.ref">
-          <span style="cursor:pointer" @click="query=b.ref;mode='search';search()">
-            <strong style="color:var(--gold)">{{b.ref}}</strong>
-            <span style="color:var(--ink-3);margin-inline-start:10px">{{b.text?.slice(0,52)}}&hellip;</span>
-          </span>
-          <button class="act" @click="removeBookmark(i)" style="color:var(--danger)">
-            <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          </button>
+        <div class="bm-item" v-for="(b,i) in bookmarks" :key="b.ref" style="flex-direction:column;align-items:stretch;gap:9px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+            <span style="cursor:pointer" @click="query=b.ref;mode='search';search()">
+              <strong style="color:var(--gold)">{{b.ref}}</strong>
+              <span style="color:var(--ink-3);margin-inline-start:10px">{{b.text?.slice(0,52)}}&hellip;</span>
+            </span>
+            <button class="act" @click="removeBookmark(i)" style="color:var(--danger)">
+              <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <textarea :value="b.note||''" @input="b.note=$event.target.value;saveBookmarks()" :placeholder="ar?'تأمّلك في هذه الآية…':'Your reflection on this verse…'" rows="2" :dir="isArabic(b.note)?'rtl':'ltr'" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font:inherit;font-size:12.5px;line-height:1.6;color:var(--ink);resize:vertical"></textarea>
         </div>
       </div>
       <div class="bm-empty" v-else>{{tr.noBookmarks}}</div>
@@ -769,7 +772,7 @@ createApp({
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
       dark,toggleTheme,lang,ar,tr,toggleLang,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
       switchMode,search,showRelated,loadSurah,copy,shareVerse,toggleMic,recording,
-      isBookmarked,toggleBookmark,removeBookmark,showToast
+      isBookmarked,toggleBookmark,removeBookmark,saveBookmarks,showToast
     }
   }
 }).mount('#app')
