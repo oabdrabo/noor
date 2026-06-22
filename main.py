@@ -735,6 +735,29 @@ def related(surah: int, ayah: int, request: Request, limit: int = 6):
     return {"results": [dict(zip(QURAN_COLS, meta[i]), score=score[i]) for i in ids if i in meta]}
 
 
+@app.get("/api/words/{surah}/{ayah}")
+def words(surah: int, ayah: int, request: Request):
+    """Word-by-word breakdown for a verse (Arabic + gloss), proxied from Quran.com. Best-effort."""
+    _rate_limit(request, 40)
+    try:
+        url = (
+            f"https://api.quran.com/api/v4/verses/by_key/{surah}:{ayah}"
+            "?words=true&word_fields=text_uthmani,char_type_name"
+        )
+        req = urllib.request.Request(url, headers={"User-Agent": "noor/1.0 (+https://noor.pyxis3.ai)"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        out = [
+            {"ar": w.get("text_uthmani", ""), "en": (w.get("translation") or {}).get("text", "")}
+            for w in data.get("verse", {}).get("words", [])
+            if w.get("char_type_name") == "word"
+        ]
+        return {"words": out}
+    except Exception as e:
+        logger.error("words fetch failed for %s:%s: %s", surah, ayah, e)
+        return {"words": []}
+
+
 @app.get("/api/analytics/surah")
 def surah_analytics(request: Request):
     df = request.app.state.df_verses
