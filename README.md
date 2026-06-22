@@ -2,26 +2,26 @@
 
 AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arabic + English) embeddings with sub-second response on a single-node deployment.
 
-نُور — *"light"* in Arabic.
+نُور - *"light"* in Arabic.
 
-**Try it: [app.noor.pyxis3.ai](https://app.noor.pyxis3.ai)** — type a question in Arabic or English ("verses about patience in adversity", "حديث عن حقوق الجار") and get matches by meaning, not keyword. ([noor.pyxis3.ai](https://noor.pyxis3.ai) is the project landing.)
+**Try it: [app.noor.pyxis3.ai](https://app.noor.pyxis3.ai)** - type a question in Arabic or English ("verses about patience in adversity", "حديث عن حقوق الجار") and get matches by meaning, not keyword. ([noor.pyxis3.ai](https://noor.pyxis3.ai) is the project landing.)
 
 <p align="center">
-  <img src="docs/screenshot-light.png" alt="Noor — search, light" width="49%">
-  <img src="docs/screenshot-dark.png" alt="Noor — search, dark" width="49%">
+  <img src="docs/screenshot-light.png" alt="Noor - search, light" width="49%">
+  <img src="docs/screenshot-dark.png" alt="Noor - search, dark" width="49%">
 </p>
 
-**Grounded Q&A** — a real answer synthesised from the retrieved verses and hadith, every claim cited inline:
+**Grounded Q&A** - a real answer synthesised from the retrieved verses and hadith, every claim cited inline:
 
-<p align="center"><img src="docs/screenshot-qa.png" alt="Noor — grounded Q&A with citations" width="80%"></p>
+<p align="center"><img src="docs/screenshot-qa.png" alt="Noor - grounded Q&A with citations" width="80%"></p>
 
 ## What it does
 
 - **Semantic search** in either Arabic or English; returns top matches across the Quran + major Hadith collections
 - **Reference lookup** (e.g. `2:255`) resolves directly to the verse
-- **Grounded Q&A (RAG)** — retrieves the most relevant verses and hadith, then an LLM writes a cited answer from *only* those passages
-- **Voice search** — speak a question; it's transcribed and run through whichever mode you're in
-- **Vector store** backed by `sqlite-vec` — embeddings live in a single SQLite file, no separate DB to operate
+- **Grounded Q&A (RAG)** - retrieves the most relevant verses and hadith, then an LLM writes a cited answer from *only* those passages
+- **Voice search** - speak a question; it's transcribed and run through whichever mode you're in
+- **Vector store** backed by `sqlite-vec` - embeddings live in a single SQLite file, no separate DB to operate
 - **TF-IDF + KMeans clustering** for topic discovery and concept maps
 - **Word-cloud generation** over the corpus
 - **Light & dark**, Arabic-first single-file Vue 3 frontend · FastAPI backend · nginx edge
@@ -54,8 +54,8 @@ The encoder loads at startup; the corpus is indexed in a background thread so th
 
 Indexing is idempotent: re-running skips already-indexed rows via a count-based resume, and changing the embedding model triggers a full rebuild. Storage paths are rooted at `NOOR_DATA_DIR`.
 
-Q&A and voice are backed by two optional services, reached server-side so no model keys reach the browser: a Claude-compatible gateway (`AIGW_URL`, `AIGW_KEY`, `AIGW_MODEL`) for grounded answers, and a Whisper transcription service (`STT_URL`, `STT_MODEL`) for voice. If either is unset or unreachable, only its endpoint returns 502 — the rest of the app is unaffected.
+Q&A and voice are backed by two optional services, reached server-side so no model keys reach the browser: a Claude-compatible gateway (`AIGW_URL`, `AIGW_KEY`, `AIGW_MODEL`) for grounded answers, and a Whisper transcription service (`STT_URL`, `STT_MODEL`) for voice. If either is unset or unreachable, only its endpoint returns 502 - the rest of the app is unaffected.
 
 ## Why
 
-Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that answers *intent* questions — *"verses about patience in adversity"*, *"hadith on neighbours' rights"* — and surfaces matches by meaning, not surface form. Multilingual embeddings make this practical; `sqlite-vec` makes it deployable on a Raspberry Pi.
+Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that answers *intent* questions - *"verses about patience in adversity"*, *"hadith on neighbours' rights"* - and surfaces matches by meaning, not surface form. Multilingual embeddings make this practical; `sqlite-vec` makes it deployable on a Raspberry Pi.

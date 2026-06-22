@@ -6,8 +6,8 @@ Measures search quality against a small gold set plus a self-retrieval probe.
 NOOR_URL=https://noor.pyxis3.ai python3 eval/run.py   # or http://localhost:8000
 ```
 
-- **curated** — known query → expected verse (Recall@1/5/10, MRR)
-- **self-retrieval** — a verse's own translation should retrieve it (sanity probe; healthy ≈ 90%+ Recall@10)
+- **curated** - known query → expected verse (Recall@1/5/10, MRR)
+- **self-retrieval** - a verse's own translation should retrieve it (sanity probe; healthy ≈ 90%+ Recall@10)
 
 Run before and after any embedding or indexing change to prove it helped, not just changed.
 
@@ -27,4 +27,4 @@ Self-retrieval at 40% is the tell: English queries are matched against half-Arab
 | curated (n=20) | 70% | 90% | 0.76 |
 | self-retrieval (n=40) | 100% | 100% | 1.00 |
 
-Self-retrieval is now perfect and curated Recall@10 went 50% → 90% — the Arabic+English concatenation was the dominant defect.
+Self-retrieval is now perfect and curated Recall@10 went 50% → 90% - the Arabic+English concatenation was the dominant defect.

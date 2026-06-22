@@ -42,7 +42,7 @@ STT_URL = os.environ.get("STT_URL", "http://stt.stt.svc.cluster.local:8000")
 STT_MODEL = os.environ.get("STT_MODEL", "Systran/faster-whisper-small")
 
 # In-memory per-IP rate limit for the expensive public endpoints (embeddings, Claude,
-# STT) — an unauthenticated flood would otherwise be a cost + resource DoS.
+# STT) - an unauthenticated flood would otherwise be a cost + resource DoS.
 _RL: dict[str, tuple[int, float]] = {}
 
 
@@ -62,7 +62,7 @@ def _rate_limit(request: Request, limit: int, window: float = 60.0) -> None:
     count += 1
     _RL[ip] = (count, reset)
     if count > limit:
-        raise HTTPException(status_code=429, detail="Too many requests — slow down.")
+        raise HTTPException(status_code=429, detail="Too many requests - slow down.")
 
 
 COL_SURAH = "surah_no"
@@ -380,7 +380,7 @@ async def lifespan(app: FastAPI):
     def _warm_and_index(state, ev):
         _index_all(state, ev)
         try:
-            # Full warm-up (embed model + sqlite-vec index) — warming the model alone
+            # Full warm-up (embed model + sqlite-vec index) - warming the model alone
             # still left the first vector MATCH cold (~6s). Run one real search.
             _vec_search(
                 state.db, "quran_vec", "quran_metadata", "verse_id", QURAN_COLS,
