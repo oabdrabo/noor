@@ -255,6 +255,12 @@ def _index_quran(state, stop):
     en = df[COL_EN].astype(str).to_numpy()
     surah = df[COL_SURAH].to_numpy()
     ayah = df[COL_AYAH].to_numpy()
+    # Prefer canonical Uthmani over the dataset's non-standard encoding for both the stored text and
+    # the embedding, so a fresh index is correct end-to-end. Existing indexes instead get the display
+    # fix from _canonicalize_quran_text (no costly re-embed).
+    uth = _load_uthmani()
+    if uth:
+        ar = np.array([uth.get(f"{int(surah[j])}:{int(ayah[j])}", ar[j]) for j in range(total)], dtype=object)
     # Embed each verse's Arabic together with its English translation so BOTH Arabic and English
     # queries match natively. The small multilingual model's cross-lingual matching is weak, so
     # en-only passages made Arabic queries (the Quran's primary language) underperform badly.
