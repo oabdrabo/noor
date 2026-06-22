@@ -26,7 +26,6 @@ logger = logging.getLogger("noor")
 
 MODEL_NAME = "intfloat/multilingual-e5-small"
 EMBED_DIM = 384
-# Bump to force a Quran re-index when the embedding strategy changes (independent of MODEL_NAME).
 QURAN_INDEX_VERSION = "2-bilingual-ar-en"
 BATCH = 64
 
@@ -43,8 +42,6 @@ AIGW_TIMEOUT = 120
 STT_URL = os.environ.get("STT_URL", "http://stt.stt.svc.cluster.local:8000")
 STT_MODEL = os.environ.get("STT_MODEL", "Systran/faster-whisper-small")
 
-# In-memory per-IP rate limit for the expensive public endpoints (embeddings, Claude,
-# STT) - an unauthenticated flood would otherwise be a cost + resource DoS.
 _RL: dict[str, tuple[int, float]] = {}
 
 
@@ -55,7 +52,7 @@ def _rate_limit(request: Request, limit: int, window: float = 60.0) -> None:
         or (request.client.host if request.client else "?")
     ).strip()
     now = time.monotonic()
-    if len(_RL) > 10000:  # bound memory: drop windows that have elapsed
+    if len(_RL) > 10000:
         for k in [k for k, (_, r) in _RL.items() if now > r]:
             del _RL[k]
     count, reset = _RL.get(ip, (0, now + window))
@@ -231,8 +228,6 @@ def _index_quran(state, stop):
     db = state.db
     df = state.df_verses
     total = len(df)
-    # Rebuild when the embedding strategy changes (e.g. en-only -> bilingual ar+en), not only on
-    # a model swap. A version mismatch wipes the Quran index alone; hadith is left untouched.
     ver = db.execute("SELECT value FROM meta WHERE key='quran_index_version'").fetchone()
     if ver is None or ver[0] != QURAN_INDEX_VERSION:
         logger.info("Quran embedding strategy changed -> rebuilding index")
@@ -427,8 +422,6 @@ async def lifespan(app: FastAPI):
     def _warm_and_index(state, ev):
         _index_all(state, ev)
         try:
-            # Full warm-up (embed model + sqlite-vec index) - warming the model alone
-            # still left the first vector MATCH cold (~6s). Run one real search.
             _vec_search(
                 state.db, "quran_vec", "quran_metadata", "verse_id", QURAN_COLS,
                 state.embed("نور"), 1,
