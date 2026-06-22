@@ -7,518 +7,269 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2313110b'/%3E%3Ctext x='16' y='23' font-size='16' text-anchor='middle' fill='%23dcab4e' font-family='sans-serif'%3E%D9%86%D9%88%D8%B1%3C/text%3E%3C/svg%3E">
   <meta name="description" content="Semantic search across the Qur'an & Hadith">
   <meta name="theme-color" content="#f6f1e7">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
   <script>document.documentElement.dataset.theme=localStorage.getItem('noor-theme')||'light';(function(){var l=localStorage.getItem('noor-lang')||'en';document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr'})()</script>
-  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    :root{
-      --bg:#f6f1e7;--bg-deep:#ece3d2;--surface:#fffdf8;--surface-2:#f3ecdc;
-      --ink:#2a251d;--ink-2:#6f6657;--ink-3:#a89e8b;
-      --gold:#a07d2c;--gold-soft:#bb9540;--gold-tint:rgba(176,140,55,.10);--gold-line:rgba(160,125,44,.30);
-      --emerald:#0d6a4c;--emerald-soft:#16855f;--emerald-tint:rgba(13,106,76,.08);
-      --danger:#b4452f;
-      --line:rgba(42,37,29,.10);--line-2:rgba(42,37,29,.17);
-      --shadow:0 8px 30px rgba(74,58,22,.10);--shadow-sm:0 2px 12px rgba(74,58,22,.07);
-      --glow:rgba(176,140,55,.10);
-      color-scheme:light;
-    }
-    html[data-theme=dark]{
-      --bg:#14120c;--bg-deep:#0d0b07;--surface:#1d1a12;--surface-2:#27231a;
-      --ink:#ece4d3;--ink-2:#b3a892;--ink-3:#7c745f;
-      --gold:#d9b56b;--gold-soft:#ecca8b;--gold-tint:rgba(217,181,107,.10);--gold-line:rgba(217,181,107,.26);
-      --emerald:#41b088;--emerald-soft:#62cda4;--emerald-tint:rgba(65,176,136,.10);
-      --danger:#e07a63;
-      --line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.15);
-      --shadow:0 10px 34px rgba(0,0,0,.45);--shadow-sm:0 2px 14px rgba(0,0,0,.32);
-      --glow:rgba(217,181,107,.10);
-      color-scheme:dark;
-    }
-    :root{
-      --r:12px;--r-lg:18px;--r-pill:999px;
-      --ui:'Inter',system-ui,-apple-system,sans-serif;
-      --display:'Cormorant Garamond','Cormorant',Georgia,serif;
-      --ar:'Amiri','Scheherazade New','Traditional Arabic',serif;
-      --ease:cubic-bezier(.22,1,.36,1);
-    }
-    html{scroll-behavior:smooth}
-    body{font-family:var(--ui);background:var(--bg);color:var(--ink);line-height:1.6;min-height:100vh;overflow-x:hidden;transition:background .4s var(--ease),color .4s var(--ease);-webkit-font-smoothing:antialiased}
-    .bg-glow{position:fixed;inset:0;z-index:0;pointer-events:none;
-      background:radial-gradient(60% 42% at 50% -6%,var(--glow),transparent 70%);}
-    a{color:var(--gold);text-decoration:none}
-    button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-    input,select{font-family:inherit;color:inherit;background:none;border:none;outline:none}
-    ::selection{background:var(--gold);color:var(--bg)}
-    ::-webkit-scrollbar{width:8px;height:8px}
-    ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:99px}
-    ::-webkit-scrollbar-track{background:transparent}
-
-    .app{max-width:820px;margin:0 auto;padding:18px 20px 110px;position:relative;z-index:1}
-
-    /* Header */
-    header{text-align:center;padding:46px 0 8px;position:relative}
-    .brand-ar{font-family:var(--ar);font-size:58px;line-height:1;color:var(--gold);font-weight:700;
-      text-shadow:0 1px 0 rgba(255,255,255,.3);letter-spacing:2px}
-    html[data-theme=dark] .brand-ar{text-shadow:0 0 28px rgba(217,181,107,.35)}
-    .brand-en{font-family:var(--display);font-size:30px;font-weight:600;letter-spacing:.5px;margin-top:2px;color:var(--ink)}
-    .ornament{display:flex;align-items:center;justify-content:center;gap:12px;margin:10px auto 6px;color:var(--gold);max-width:240px;opacity:.8}
-    .ornament::before,.ornament::after{content:'';height:1px;flex:1;background:linear-gradient(90deg,transparent,var(--gold-line))}
-    .ornament::after{background:linear-gradient(90deg,var(--gold-line),transparent)}
-    .ornament svg{width:13px;height:13px;fill:var(--gold);flex-shrink:0}
-    .tagline{color:var(--ink-3);font-size:12.5px;letter-spacing:1.4px;text-transform:uppercase;font-weight:500}
-    .header-actions{position:absolute;top:30px;right:0;display:flex;gap:8px}
-    .icon-btn{width:38px;height:38px;border-radius:var(--r);display:flex;align-items:center;justify-content:center;
-      background:var(--surface);border:1px solid var(--line);transition:all .2s var(--ease);box-shadow:var(--shadow-sm);position:relative}
-    .icon-btn:hover{border-color:var(--gold-line);transform:translateY(-1px)}
-    .icon-btn svg{width:16px;height:16px;stroke:var(--ink-2);fill:none;stroke-width:1.8}
-    .icon-btn .badge{position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;padding:0 3px;border-radius:99px;
-      background:var(--gold);color:var(--bg);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
-
-    /* Status */
-    .status{display:flex;gap:18px;justify-content:center;align-items:center;padding:14px 0 4px;color:var(--ink-3);font-size:11.5px;letter-spacing:.4px;flex-wrap:wrap}
-    .status .s{display:flex;align-items:center;gap:6px}
-    .status strong{color:var(--ink-2);font-variant-numeric:tabular-nums;font-weight:600}
-    .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 3px var(--emerald-tint)}
-    .dot.ready{background:var(--emerald)}
-    .dot.load{background:var(--gold);box-shadow:0 0 0 3px var(--gold-tint);animation:pulse 1.6s infinite}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-    .status .pill{padding:2px 10px;border-radius:var(--r-pill);font-weight:600;font-size:10.5px;letter-spacing:.6px}
-    .status .pill.ready{color:var(--emerald);background:var(--emerald-tint)}
-    .status .pill.load{color:var(--gold);background:var(--gold-tint)}
-
-    /* Tabs */
-    .tabs{display:flex;gap:4px;margin:18px 0 16px;padding:5px;background:var(--surface-2);border:1px solid var(--line);
-      border-radius:var(--r-pill);overflow-x:auto;scrollbar-width:none}
-    .tabs::-webkit-scrollbar{display:none}
-    .tab{padding:9px 16px;border-radius:var(--r-pill);font-size:12.5px;font-weight:500;color:var(--ink-3);white-space:nowrap;
-      transition:all .22s var(--ease);letter-spacing:.2px}
-    .tab:hover{color:var(--ink-2)}
-    .tab.active{background:var(--surface);color:var(--gold);box-shadow:var(--shadow-sm);font-weight:600}
-
-    /* Search */
-    .search-wrap{position:relative;margin-bottom:14px}
-    .search-box{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);
-      border-radius:var(--r-lg);padding:7px 7px 7px 18px;transition:all .25s var(--ease);box-shadow:var(--shadow-sm)}
-    .search-box:focus-within{border-color:var(--gold-line);box-shadow:0 0 0 4px var(--gold-tint),var(--shadow-sm)}
-    .search-box input{flex:1;padding:11px 0;font-size:15px;min-width:0;letter-spacing:.2px}
-    .search-box input::placeholder{color:var(--ink-3)}
-    .search-box input[dir=rtl]{text-align:right;font-family:var(--ar);font-size:19px}
-    .mic-btn,.go-btn{width:42px;height:42px;border-radius:var(--r);display:flex;align-items:center;justify-content:center;
-      transition:all .2s var(--ease);flex-shrink:0}
-    .mic-btn{background:var(--surface-2);border:1px solid var(--line)}
-    .mic-btn:hover{border-color:var(--gold-line)}
-    .mic-btn svg{width:17px;height:17px;stroke:var(--ink-2);fill:none;stroke-width:1.8}
-    .mic-btn.rec{background:var(--danger);border-color:transparent;animation:pulse 1.2s infinite}
-    .mic-btn.rec svg{stroke:#fff}
-    .go-btn{background:linear-gradient(135deg,var(--gold-soft),var(--gold));box-shadow:0 4px 14px var(--gold-tint)}
-    .go-btn:hover{transform:scale(1.05)}
-    .go-btn:active{transform:scale(.95)}
-    .go-btn svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.4}
-    html[data-theme=light] .go-btn svg{stroke:#fffdf8}
-
-    /* Filters */
-    .filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
-    .filter-select{padding:8px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
-      font-size:12px;color:var(--ink-2);cursor:pointer;transition:border-color .2s;box-shadow:var(--shadow-sm)}
-    .filter-select:focus{border-color:var(--gold-line)}
-    .filter-count{font-size:12px;color:var(--ink-3)}
-
-    /* Chips */
-    .chips-label{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink-3);margin:6px 2px 12px;font-weight:600}
-    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-    .chip{padding:8px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-pill);
-      font-size:12.5px;color:var(--ink-2);transition:all .2s var(--ease);box-shadow:var(--shadow-sm)}
-    .chip:hover{border-color:var(--gold-line);color:var(--gold);transform:translateY(-1px)}
-
-    /* Results / cards */
-    .results{display:flex;flex-direction:column;gap:14px}
-    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 24px;
-      transition:all .25s var(--ease);position:relative;box-shadow:var(--shadow-sm);animation:rise .4s var(--ease) both;overflow:hidden}
-    .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
-      background:linear-gradient(90deg,transparent,var(--gold-line),transparent);opacity:0;transition:opacity .25s}
-    .card:hover{border-color:var(--line-2);box-shadow:var(--shadow);transform:translateY(-2px)}
-    .card:hover::before{opacity:1}
-    @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-    .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:10px}
-    .ref{font-family:var(--display);font-size:16px;font-weight:600;color:var(--gold);display:inline-flex;align-items:center;gap:7px;letter-spacing:.3px}
-    .ref::before{content:'';width:7px;height:7px;border-radius:2px;transform:rotate(45deg);background:var(--gold);flex-shrink:0;opacity:.7}
-    .collection{font-size:10.5px;color:var(--emerald);text-transform:uppercase;letter-spacing:1.3px;font-weight:700;font-family:var(--ui)}
-    .score{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;padding:4px 10px;border-radius:var(--r-pill);letter-spacing:.3px}
-    .s-high{color:var(--emerald);background:var(--emerald-tint)}
-    .s-med{color:var(--gold);background:var(--gold-tint)}
-    .s-low{color:var(--ink-3);background:var(--surface-2)}
-
-    .arabic{font-family:var(--ar);font-size:30px;line-height:2.1;direction:rtl;text-align:right;
-      padding:20px 24px;background:var(--bg-deep);border-radius:var(--r);margin-bottom:16px;font-weight:700;
-      border-right:3px solid var(--gold);color:var(--ink)}
-    .translation{font-size:15px;color:var(--ink-2);line-height:1.85;letter-spacing:.1px}
-    .hadith-text{font-size:14.5px;line-height:1.85;color:var(--ink-2)}
-
-    .actions{display:flex;gap:4px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line);flex-wrap:wrap}
-    .act{font-size:12px;color:var(--ink-3);padding:7px 12px;border-radius:var(--r);transition:all .15s var(--ease);
-      display:inline-flex;align-items:center;gap:6px;letter-spacing:.2px}
-    .act:hover{background:var(--surface-2);color:var(--ink)}
-    .act svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.9}
-    .act.on{color:var(--gold)}
-
-    /* Q&A */
-    .qa{background:linear-gradient(180deg,var(--gold-tint),transparent);border:1px solid var(--gold-line);
-      border-radius:var(--r-lg);padding:26px 28px;margin-bottom:18px;position:relative}
-    .qa-label{font-family:var(--ui);font-size:10.5px;color:var(--gold);text-transform:uppercase;letter-spacing:1.6px;
-      font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-    .qa-label::after{content:'';flex:1;height:1px;background:var(--gold-line)}
-    .qa-body{font-size:15.5px;line-height:1.95;color:var(--ink);white-space:pre-wrap}
-    .qa-body::first-letter{font-family:var(--display);font-size:1.05em}
-    .sources-label{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink-3);margin:4px 2px 10px;font-weight:600}
-
-    /* Count */
-    .count{text-align:center;padding:40px 20px 28px}
-    .count .n{font-family:var(--display);font-size:78px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
-    .count .l{font-size:14px;color:var(--ink-2);margin-top:8px}
-
-    /* Themes */
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
-    .theme-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;
-      transition:all .22s var(--ease);box-shadow:var(--shadow-sm)}
-    .theme-card:hover{border-color:var(--gold-line);transform:translateY(-2px);box-shadow:var(--shadow)}
-    .theme-title{font-family:var(--display);font-size:18px;font-weight:600;margin-bottom:2px;color:var(--ink)}
-    .theme-size{font-size:12px;color:var(--ink-3)}
-    .kw{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-    .kw span{font-size:11px;background:var(--surface-2);padding:4px 10px;border-radius:var(--r-pill);color:var(--ink-2);border:1px solid var(--line)}
-
-    /* Browse */
-    .surahs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
-    .surah{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 8px;text-align:center;
-      transition:all .2s var(--ease);cursor:pointer;box-shadow:var(--shadow-sm)}
-    .surah:hover{border-color:var(--gold-line);transform:translateY(-2px);box-shadow:var(--shadow)}
-    .surah .n{font-family:var(--display);font-size:24px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
-    .surah .l{font-size:10px;color:var(--ink-3);letter-spacing:.4px;text-transform:uppercase;margin-top:2px}
-    .browse-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
-
-    /* Analytics */
-    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:26px}
-    .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px 16px;text-align:center;box-shadow:var(--shadow-sm)}
-    .stat .n{font-family:var(--display);font-size:34px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
-    .stat .l{font-size:11px;color:var(--ink-3);margin-top:6px;letter-spacing:.5px;text-transform:uppercase}
-    .section-h{font-family:var(--display);font-size:22px;font-weight:600;margin:0 0 16px;color:var(--ink)}
-    .dist{display:flex;align-items:center;gap:12px;padding:7px 0}
-    .dist .lbl{font-size:12.5px;color:var(--ink-2);width:150px;flex-shrink:0;text-align:end}
-    .dist .track{flex:1;height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden}
-    .dist .fill{height:100%;border-radius:99px;transition:width .8s var(--ease)}
-    .dist .v{font-size:11px;color:var(--ink-3);width:40px;text-align:end;font-variant-numeric:tabular-nums}
-    .wc{width:100%;border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--shadow-sm);margin-top:6px}
-
-    /* Bookmarks */
-    .bm{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px;margin-bottom:16px;box-shadow:var(--shadow-sm)}
-    .bm h3{font-family:var(--display);font-size:19px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:var(--ink)}
-    .bm-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-deep);border-radius:var(--r);margin-bottom:6px;font-size:13px}
-    .bm-item:last-child{margin-bottom:0}
-    .bm-empty{text-align:center;color:var(--ink-3);font-size:13px;padding:18px}
-
-    /* States */
-    .spinner{width:15px;height:15px;border:2px solid var(--gold-line);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;flex-shrink:0}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .skeleton{height:150px;border-radius:var(--r-lg);margin-bottom:14px;
-      background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 50%,var(--surface) 75%);
-      background-size:200% 100%;animation:shimmer 1.6s infinite}
-    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-    .empty{text-align:center;padding:60px 20px;color:var(--ink-3)}
-    .empty svg{width:44px;height:44px;stroke:var(--gold-line);fill:none;stroke-width:1.3;margin-bottom:14px}
-    .empty h3{font-family:var(--display);color:var(--ink-2);font-size:20px;font-weight:600;margin-bottom:4px}
-    .empty p{font-size:13px}
-    .notice{display:flex;align-items:center;gap:12px;padding:16px 20px;border-radius:var(--r);font-size:13.5px;margin-bottom:16px}
-    .notice.err{background:rgba(180,69,47,.07);border:1px solid rgba(180,69,47,.2);color:var(--danger)}
-    .notice.info{background:var(--gold-tint);border:1px solid var(--gold-line);color:var(--gold)}
-
-    /* Toast */
-    .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--ink);color:var(--bg);
-      padding:11px 22px;border-radius:var(--r-pill);font-size:13px;opacity:0;transition:all .3s var(--ease);z-index:100;box-shadow:var(--shadow);font-weight:500}
-    .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-
-    .foot{text-align:center;margin-top:46px;color:var(--ink-3);font-size:11.5px;letter-spacing:.4px}
-    .foot a{color:var(--ink-3);border-bottom:1px solid var(--gold-line)}
-    .foot a:hover{color:var(--gold)}
-
-    @media(max-width:600px){
-      .app{padding:10px 14px 90px}
-      header{padding:30px 0 6px}
-      .brand-ar{font-size:46px}.brand-en{font-size:25px}
-      .header-actions{top:16px}
-      .card{padding:18px}.arabic{font-size:24px;padding:16px}
-      .surahs{grid-template-columns:repeat(auto-fill,minmax(78px,1fr))}
-      .stats-grid{grid-template-columns:1fr 1fr}
-      .dist .lbl{width:96px;font-size:11px}
-      .count .n{font-size:60px}
-    }
-    .wbw{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0;direction:rtl}
-    .wbw-w{display:flex;flex-direction:column;align-items:center;background:var(--surface);border:1px solid var(--gold-line);border-radius:9px;padding:6px 11px;min-width:46px}
-    .wbw-ar{font-family:var(--ar);font-size:20px;line-height:1.5;color:var(--ink)}
-    .wbw-en{font-size:10.5px;color:var(--ink-3);margin-top:2px;direction:ltr;text-align:center}
-    .inline-sec{margin:12px 0;padding:12px 14px;background:var(--gold-tint);border:1px solid var(--gold-line);border-radius:11px}
-    .inline-label{font-family:var(--ui);font-size:10.5px;color:var(--gold);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:8px}
-    .inline-body{font-size:14px;line-height:1.85;color:var(--ink)}
-    .inline-loading{display:flex;justify-content:center;padding:6px}
-    .rel-v{padding:7px 0;border-top:1px solid var(--gold-line);cursor:pointer;font-size:13.5px;color:var(--ink-3);transition:color .15s}
-    .rel-v:first-of-type{border-top:none}
-    .rel-v:hover{color:var(--gold)}
-    .rel-v strong{color:var(--gold);margin-inline-end:8px}
-    .trans-row{padding:8px 0;border-top:1px solid var(--gold-line);font-size:13.5px;line-height:1.7;color:var(--ink)}
-    .trans-row:first-of-type{border-top:none}
-    .trans-name{display:block;font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
-    .act.ico{padding:8px;min-width:0}
-    .act.ico.on{background:var(--gold-tint);border-color:var(--gold-line);color:var(--gold)}
-    .ref-name{color:var(--gold);font-weight:600;margin-inline-end:7px}
-    @keyframes expandIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-    .wbw,.inline-sec{animation:expandIn .22s ease}
-  </style>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/vue.global.prod.js"></script>
 </head>
-<body>
-<div class="bg-glow"></div>
+<body class="font-ui bg-bg text-ink min-h-screen overflow-x-hidden antialiased transition-colors duration-300 ease-noor selection:bg-gold selection:text-bg">
 <div id="app">
-  <div class="app">
-    <header>
-      <div class="brand-ar">&#1606;&#1608;&#1585;</div>
-      <div class="brand-en">Noor</div>
-      <div class="ornament"><svg viewBox="0 0 24 24"><path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z"/></svg></div>
-      <p class="tagline">{{tr.tagline}}</p>
-      <div class="header-actions">
-        <button class="icon-btn" @click="toggleLang" :title="tr.switchLang" style="font-family:var(--ui);font-size:12.5px;font-weight:700;letter-spacing:.5px">{{ar?'EN':'ع'}}</button>
-        <button class="icon-btn" @click="toggleTheme" :title="dark?tr.lightMode:tr.darkMode">
-          <svg v-if="dark" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
-          <svg v-else viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+  <div class="max-w-3xl mx-auto px-5 pt-5 pb-28">
+    <header class="text-center pt-11 pb-2 relative">
+      <div class="font-ar text-6xl leading-none text-gold font-bold">&#1606;&#1608;&#1585;</div>
+      <div class="font-display text-3xl font-semibold tracking-wide text-ink">Noor</div>
+      <div class="flex justify-center my-2 text-gold/70"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 fill-current"><path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z"/></svg></div>
+      <p class="font-ui text-sm text-ink-3">{{tr.tagline}}</p>
+      <div class="absolute top-10 end-0 flex gap-2">
+        <button class="w-10 h-10 rounded-full grid place-items-center border border-line text-ink-2 font-ui text-xs font-bold tracking-wide hover:text-gold hover:border-gold/40 transition-colors" @click="toggleLang" :title="tr.switchLang">{{ar?'EN':'ع'}}</button>
+        <button class="w-10 h-10 rounded-full grid place-items-center border border-line text-ink-2 hover:text-gold hover:border-gold/40 transition-colors" @click="toggleTheme" :title="dark?tr.lightMode:tr.darkMode">
+          <svg v-if="dark" viewBox="0 0 24 24" class="w-4 h-4 stroke-current fill-none stroke-2"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+          <svg v-else viewBox="0 0 24 24" class="w-4 h-4 stroke-current fill-none stroke-2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
         </button>
-        <button class="icon-btn" @click="showBookmarks=!showBookmarks" :title="bookmarks.length+' bookmarks'">
-          <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-          <span class="badge" v-if="bookmarks.length">{{bookmarks.length}}</span>
+        <button class="relative w-10 h-10 rounded-full grid place-items-center border border-line text-ink-2 hover:text-gold hover:border-gold/40 transition-colors" @click="showBookmarks=!showBookmarks" :title="bookmarks.length+' bookmarks'">
+          <svg viewBox="0 0 24 24" class="w-4 h-4 stroke-current fill-none stroke-2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+          <span v-if="bookmarks.length" class="absolute -top-1 -end-1 min-w-4 h-4 px-1 rounded-full bg-gold text-bg text-2xs font-bold grid place-items-center">{{bookmarks.length}}</span>
         </button>
       </div>
     </header>
 
-    <div class="status" v-if="stats">
-      <span class="s"><span class="dot" :class="stats.status==='Ready'?'ready':'load'"></span> <strong>{{fmt(stats.indexed_verses)}}</strong> {{tr.verses}}</span>
-      <span class="s"><strong>{{fmt(stats.total_hadiths)}}</strong> {{tr.hadith}}</span>
-      <span class="pill" :class="stats.status==='Ready'?'ready':'load'">{{stats.status}}</span>
+    <div class="flex items-center justify-center gap-4 text-xs text-ink-3 mt-3" v-if="stats">
+      <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" :class="stats.status==='Ready'?'bg-emerald':'bg-gold'"></span> <strong class="text-ink-2 font-semibold">{{fmt(stats.indexed_verses)}}</strong> {{tr.verses}}</span>
+      <span class="flex items-center gap-1.5"><strong class="text-ink-2 font-semibold">{{fmt(stats.total_hadiths)}}</strong> {{tr.hadith}}</span>
+      <span class="px-2.5 py-0.5 rounded-full border border-line font-medium" :class="stats.status==='Ready'?'text-emerald':'text-gold'">{{stats.status}}</span>
     </div>
 
-    <div class="bm" v-if="showBookmarks">
-      <h3><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{tr.bookmarks}} ({{bookmarks.length}})</h3>
-      <div v-if="bookmarks.length">
-        <div class="bm-item" v-for="(b,i) in bookmarks" :key="b.ref" style="flex-direction:column;align-items:stretch;gap:9px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-            <span style="cursor:pointer" @click="query=b.ref;mode='search';search()">
-              <strong style="color:var(--gold)">{{b.ref}}</strong>
-              <span style="color:var(--ink-3);margin-inline-start:10px">{{b.text?.slice(0,52)}}&hellip;</span>
+    <div class="mt-5 rounded-2xl border border-line bg-surface p-4" v-if="showBookmarks">
+      <h3 class="flex items-center gap-2 text-sm font-semibold text-ink mb-3"><svg viewBox="0 0 24 24" class="w-4 h-4 stroke-gold fill-none stroke-2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{tr.bookmarks}} ({{bookmarks.length}})</h3>
+      <div v-if="bookmarks.length" class="flex flex-col gap-3">
+        <div class="flex flex-col items-stretch gap-2.5" v-for="(b,i) in bookmarks" :key="b.ref">
+          <div class="flex justify-between items-center gap-2.5">
+            <span class="cursor-pointer" @click="query=b.ref;mode='search';source='quran';search()">
+              <strong class="text-gold">{{b.ref}}</strong>
+              <span class="text-ink-3 ms-2.5">{{b.text?.slice(0,52)}}&hellip;</span>
             </span>
-            <button class="act" @click="removeBookmark(i)" style="color:var(--danger)">
-              <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <button class="text-danger p-1.5 rounded-lg hover:bg-surface-2 transition-colors" @click="removeBookmark(i)">
+              <svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-none stroke-2"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
-          <textarea :value="b.note||''" @input="b.note=$event.target.value;saveBookmarks()" :placeholder="ar?'تأمّلك في هذه الآية…':'Your reflection on this verse…'" rows="2" :dir="isArabic(b.note)?'rtl':'ltr'" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font:inherit;font-size:12.5px;line-height:1.6;color:var(--ink);resize:vertical"></textarea>
+          <textarea :value="b.note||''" @input="b.note=$event.target.value;saveBookmarks()" :placeholder="ar?'تأمّلك في هذه الآية…':'Your reflection on this verse…'" rows="2" :dir="isArabic(b.note)?'rtl':'ltr'" class="w-full box-border bg-surface-2 border border-line rounded-lg px-3 py-2 font-ui text-xs leading-relaxed text-ink resize-y focus:border-gold/40"></textarea>
         </div>
       </div>
-      <div class="bm-empty" v-else>{{tr.noBookmarks}}</div>
+      <div class="text-sm text-ink-3" v-else>{{tr.noBookmarks}}</div>
     </div>
 
-    <div class="tabs">
-      <button class="tab" :class="{active:mode===m.id}" v-for="m in modes" :key="m.id" @click="switchMode(m)">{{ar?m.labelAr:m.label}}</button>
+    <div class="flex items-center justify-between gap-2.5 mt-5 mb-4">
+      <div class="flex gap-1 p-1.5 bg-surface-2 border border-line rounded-full overflow-x-auto">
+        <button class="px-4 py-2 rounded-full text-xs whitespace-nowrap transition-colors" :class="mode===i.id?'bg-surface text-gold shadow-sm font-semibold':'text-ink-3 font-medium hover:text-ink-2'" v-for="i in intents" :key="i.id" @click="switchMode(i)">{{ar?i.labelAr:i.label}}</button>
+      </div>
+      <button class="flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors shrink-0" :class="exploring?'bg-gold/10 text-gold border-gold/40':'text-ink-3 border-line bg-surface-2 hover:text-gold hover:border-gold/40'" @click="toggleExplore" :title="tr.explore">
+        <svg viewBox="0 0 24 24" class="w-4 h-4 stroke-current fill-none stroke-2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3.4M12 18.6V22M2 12h3.4M18.6 12H22M4.9 4.9l2.4 2.4M16.7 16.7l2.4 2.4M19.1 4.9l-2.4 2.4M7.3 16.7l-2.4 2.4"/></svg>
+        <span class="max-sm:hidden">{{tr.explore}}</span>
+      </button>
     </div>
 
-    <div class="search-wrap" v-if="currentMode.hasSearch!==false">
-      <div class="search-box">
-        <input ref="searchInput" v-model="query" :placeholder="ar?currentMode.placeholderAr:currentMode.placeholder" :dir="isArabic(query)?'rtl':'ltr'" @keydown.enter="search" @keydown.escape="query=''">
-        <button class="mic-btn" :class="{rec:recording}" @click="toggleMic" :title="recording?tr.stopRec:tr.voice">
-          <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+    <div class="relative mb-3.5" v-if="!exploring">
+      <div class="flex items-center gap-1.5 bg-surface border border-line rounded-2xl px-3 focus-within:border-gold/50 focus-within:ring-4 focus-within:ring-gold/10 transition-colors">
+        <div class="flex gap-0.5 bg-surface-2 border border-line rounded-full p-0.5 me-1.5 shrink-0" v-if="mode==='search'">
+          <button class="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors" :class="source==='quran'?'bg-surface text-gold shadow-sm':'text-ink-3'" @click="source='quran';searched&&search()">{{tr.sourceQuran}}</button>
+          <button class="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors" :class="source==='hadith'?'bg-surface text-gold shadow-sm':'text-ink-3'" @click="source='hadith';searched&&search()">{{tr.sourceHadith}}</button>
+        </div>
+        <input ref="searchInput" v-model="query" :placeholder="ar?currentMode.placeholderAr:currentMode.placeholder" :dir="isArabic(query)?'rtl':'ltr'" @keydown.enter="search" @keydown.escape="query=''" class="flex-1 min-w-0 py-3 text-base bg-transparent outline-none placeholder:text-ink-3 rtl:text-right rtl:font-ar rtl:text-lg">
+        <button class="w-10 h-10 rounded-xl grid place-items-center border border-line transition-colors" :class="recording?'bg-danger border-transparent animate-pulse':'bg-surface-2 hover:border-gold/40'" @click="toggleMic" :title="recording?tr.stopRec:tr.voice">
+          <svg viewBox="0 0 24 24" class="w-4 h-4 stroke-2 fill-none" :class="recording?'stroke-white':'stroke-ink-2'"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
         </button>
-        <button class="go-btn" @click="search" :disabled="loading">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <button class="w-10 h-10 rounded-xl grid place-items-center bg-gold shadow-md hover:scale-105 active:scale-95 transition-transform disabled:opacity-60" @click="search" :disabled="loading">
+          <svg viewBox="0 0 24 24" class="w-4 h-4 stroke-white fill-none stroke-2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         </button>
       </div>
     </div>
 
-    <div v-if="mode==='qa'" style="margin:-6px 0 16px;font-size:13px;color:var(--ink-3)">
-      <label style="display:inline-flex;align-items:center;gap:7px;cursor:pointer">
-        <input type="checkbox" v-model="onlineSearch" style="accent-color:var(--gold);width:15px;height:15px">
+    <div class="flex gap-1 p-1.5 bg-surface-2 border border-line rounded-full w-fit max-w-full overflow-x-auto mb-4" v-if="exploring">
+      <button class="px-4 py-2 rounded-full text-xs whitespace-nowrap transition-colors" :class="mode===e.id?'bg-surface text-gold shadow-sm font-semibold':'text-ink-3 font-medium hover:text-ink-2'" v-for="e in explores" :key="e.id" @click="switchMode(e)">{{ar?e.labelAr:e.label}}</button>
+    </div>
+
+    <div v-if="mode==='qa'" class="-mt-1.5 mb-4 text-sm text-ink-3">
+      <label class="inline-flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" v-model="onlineSearch" class="w-4 h-4 accent-gold">
         {{ar?'بحث على الإنترنت · تفسير ابن كثير (Quran.com)':'Search online · Ibn Kathir tafsir (Quran.com)'}}
       </label>
     </div>
-    <div class="filters" v-if="mode==='search' && searched">
-      <select class="filter-select" v-model.number="surahFilter" @change="search()">
+    <div class="flex gap-2.5 mb-4 flex-wrap items-center" v-if="mode==='search' && searched && source==='quran'">
+      <select class="px-3 py-2 bg-surface border border-line rounded-xl text-sm text-ink focus:border-gold/40" v-model.number="surahFilter" @change="search()">
         <option :value="0">{{tr.allSurahs}}</option>
         <option v-for="n in 114" :value="n">{{n}}. {{surahName(n)||tr.surah+' '+n}}</option>
       </select>
-      <span class="filter-count" v-if="results.length">{{results.length}} {{tr.results}}</span>
+      <span class="text-xs text-ink-3" v-if="results.length">{{results.length}} {{tr.results}}</span>
     </div>
 
     <div v-if="!results.length && !loading && !searched && currentMode.hasSearch!==false">
-      <div v-if="dailyVerse && mode==='search'" style="margin-bottom:22px">
-        <div class="chips-label">{{tr.dailyVerse}}</div>
+      <div v-if="dailyVerse && mode==='search'" class="mb-6">
+        <div class="text-2xs tracking-widest uppercase text-ink-3 font-semibold mx-0.5 mb-3">{{tr.dailyVerse}}</div>
         <verse-card :v="dailyVerse"></verse-card>
       </div>
-      <div class="chips-label">{{tr.tryLabel}}</div>
-      <div class="chips">
-        <button class="chip" v-for="s in chips" :key="s.q" @click="query=s.q;mode=s.mode||'search';search()">{{ar?s.labelAr:s.label}}</button>
+      <div class="text-2xs tracking-widest uppercase text-ink-3 font-semibold mx-0.5 mb-3">{{tr.tryLabel}}</div>
+      <div class="flex gap-2 flex-wrap">
+        <button class="px-4 py-2 bg-surface border border-line rounded-full text-sm text-ink-2 hover:border-gold/40 hover:text-gold hover:-translate-y-px transition" v-for="s in chips" :key="s.q" @click="query=s.q;mode=s.mode||'search';source=s.source||'quran';search()">{{ar?s.labelAr:s.label}}</button>
       </div>
     </div>
 
-    <div v-if="loading">
-      <div class="skeleton" v-for="n in 3" :key="n"></div>
+    <div v-if="loading" class="flex flex-col gap-3">
+      <div class="h-24 rounded-2xl bg-surface-2 animate-pulse" v-for="n in 3" :key="n"></div>
     </div>
 
-    <div class="notice" :class="isIndexingError?'info':'err'" v-if="error">
-      <span class="spinner" v-if="isIndexingError"></span>
+    <div class="flex items-center gap-2.5 p-3.5 rounded-xl border text-sm" :class="isIndexingError?'border-gold/30 bg-gold/10 text-ink-2':'border-danger/30 bg-danger/10 text-danger'" v-if="error">
+      <span class="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" v-if="isIndexingError"></span>
       <span>{{error}}</span>
     </div>
 
-    <div class="results" v-if="!loading && !error">
+    <div class="flex flex-col gap-4" v-if="!loading && !error">
 
-      <!-- Q&A -->
       <template v-if="(mode==='qa'||mode==='reflect') && qaAnswer">
-        <div class="qa" v-if="qaAnswer.answer">
-          <div class="qa-label">{{tr.answer}} · {{tr.groundedIn}} {{qaAnswer.citations?.length||0}} {{tr.sources}}<span v-if="qaAnswer.online" style="margin-inline-start:8px;color:var(--gold)">· {{ar?'تفسير':'+'}} {{qaAnswer.online.label}} ({{qaAnswer.online.via}})</span></div>
-          <div class="qa-body" v-html="mdLite(qaAnswer.answer)"></div>
+        <div class="rounded-2xl border border-gold/30 bg-gold/10 p-5" v-if="qaAnswer.answer">
+          <div class="text-2xs tracking-widest uppercase text-gold font-semibold mb-2.5">{{tr.answer}} · {{tr.groundedIn}} {{qaAnswer.citations?.length||0}} {{tr.sources}}<span v-if="qaAnswer.online" class="ms-2 text-gold">· {{ar?'تفسير':'+'}} {{qaAnswer.online.label}} ({{qaAnswer.online.via}})</span></div>
+          <div class="text-ink leading-relaxed" v-html="mdLite(qaAnswer.answer)"></div>
         </div>
-        <div class="sources-label" v-if="qaAnswer.citations?.length">{{tr.sourcesH}}</div>
+        <div class="text-2xs tracking-widest uppercase text-ink-3 font-semibold mt-1" v-if="qaAnswer.citations?.length">{{tr.sourcesH}}</div>
         <verse-card v-for="(r,i) in qaAnswer.citations" :key="i" :v="r" :idx="i"></verse-card>
       </template>
 
-      <!-- Count -->
       <template v-else-if="mode==='count' && countResult">
-        <div class="count">
-          <div class="n">{{fmt(countResult.count)}}</div>
-          <div class="l">&ldquo;{{countResult.word}}&rdquo; {{tr.appearsIn}} {{fmt(countResult.total_verses_with_word)}} {{tr.inVerses}}</div>
+        <div class="text-center py-6">
+          <div class="font-display text-6xl font-bold text-gold">{{fmt(countResult.count)}}</div>
+          <div class="text-sm text-ink-3 mt-1">&ldquo;{{countResult.word}}&rdquo; {{tr.appearsIn}} {{fmt(countResult.total_verses_with_word)}} {{tr.inVerses}}</div>
         </div>
         <verse-card v-for="(e,i) in countResult.examples" :key="i" :v="{surah:e.surah,ayah:e.ayah,translation:e.text}" :idx="i"></verse-card>
       </template>
 
-      <!-- Themes -->
       <template v-else-if="mode==='themes' && themes">
-        <div class="grid">
-          <div class="theme-card" v-for="(t,id) in themes" :key="id">
-            <div class="theme-title">{{tr.theme}} {{Number(id)+1}}</div>
-            <div class="theme-size">{{t.size}} {{tr.verses}}</div>
-            <div class="kw"><span v-for="k in t.keywords" :key="k">{{k}}</span></div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div class="rounded-2xl border border-line bg-surface p-4" v-for="(t,id) in themes" :key="id">
+            <div class="text-sm font-semibold text-gold">{{tr.theme}} {{Number(id)+1}}</div>
+            <div class="text-xs text-ink-3 mt-0.5">{{t.size}} {{tr.verses}}</div>
+            <div class="flex flex-wrap gap-1.5 mt-2.5"><span class="text-xs px-2 py-0.5 rounded-full bg-surface-2 text-ink-2" v-for="k in t.keywords" :key="k">{{k}}</span></div>
           </div>
         </div>
       </template>
 
-      <!-- Analytics -->
       <template v-else-if="mode==='analytics'">
-        <div class="stats-grid" v-if="analyticsData">
-          <div class="stat"><div class="n">{{fmt(analyticsData.surah?.total_surahs||114)}}</div><div class="l">{{tr.surahs}}</div></div>
-          <div class="stat"><div class="n">{{fmt(analyticsData.surah?.total_verses||0)}}</div><div class="l">{{tr.versesC}}</div></div>
-          <div class="stat"><div class="n">{{analyticsData.surah?.average_verses_per_surah||0}}</div><div class="l">{{tr.avgSurah}}</div></div>
-          <div class="stat"><div class="n">{{fmt(analyticsData.frequency?.total_unique_words||0)}}</div><div class="l">{{tr.uniqueWords}}</div></div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" v-if="analyticsData">
+          <div class="rounded-2xl border border-line bg-surface p-4 text-center"><div class="font-display text-3xl font-bold text-gold">{{fmt(analyticsData.surah?.total_surahs||114)}}</div><div class="text-xs text-ink-3 mt-1">{{tr.surahs}}</div></div>
+          <div class="rounded-2xl border border-line bg-surface p-4 text-center"><div class="font-display text-3xl font-bold text-gold">{{fmt(analyticsData.surah?.total_verses||0)}}</div><div class="text-xs text-ink-3 mt-1">{{tr.versesC}}</div></div>
+          <div class="rounded-2xl border border-line bg-surface p-4 text-center"><div class="font-display text-3xl font-bold text-gold">{{analyticsData.surah?.average_verses_per_surah||0}}</div><div class="text-xs text-ink-3 mt-1">{{tr.avgSurah}}</div></div>
+          <div class="rounded-2xl border border-line bg-surface p-4 text-center"><div class="font-display text-3xl font-bold text-gold">{{fmt(analyticsData.frequency?.total_unique_words||0)}}</div><div class="text-xs text-ink-3 mt-1">{{tr.uniqueWords}}</div></div>
         </div>
-        <h3 class="section-h" v-if="distribution">{{tr.themeDist}}</h3>
-        <div v-if="distribution" style="margin-bottom:26px">
-          <div class="dist" v-for="(val,theme) in distribution" :key="theme">
-            <div class="lbl">{{theme}}</div>
-            <div class="track"><div class="fill" :style="{width:distPct(val)+'%',background:distColor(theme)}"></div></div>
-            <span class="v">{{fmt(val)}}</span>
+        <h3 class="font-display text-xl font-semibold text-ink mt-2" v-if="distribution">{{tr.themeDist}}</h3>
+        <div v-if="distribution" class="flex flex-col gap-2.5">
+          <div class="flex items-center gap-3" v-for="(val,theme) in distribution" :key="theme">
+            <div class="w-28 text-xs text-ink-2 shrink-0 capitalize">{{theme}}</div>
+            <div class="flex-1 h-2 rounded-full bg-surface-2 overflow-hidden"><div class="h-full rounded-full bg-gold" :style="{width:distPct(val)+'%'}"></div></div>
+            <span class="text-xs text-ink-3 w-10 text-end">{{fmt(val)}}</span>
           </div>
         </div>
         <div v-if="wordcloudImg">
-          <h3 class="section-h">{{tr.wordCloud}}</h3>
-          <img :src="wordcloudImg" class="wc" alt="Word cloud">
+          <h3 class="font-display text-xl font-semibold text-ink mt-2 mb-3">{{tr.wordCloud}}</h3>
+          <img :src="wordcloudImg" class="w-full rounded-2xl border border-line" alt="Word cloud">
         </div>
       </template>
 
-      <!-- Browse -->
       <template v-else-if="mode==='browse'">
         <div v-if="!browseSurah && !browseJuz">
-          <div class="tabs" style="margin-bottom:14px">
-            <button class="tab" :class="{active:browseTab==='surah'}" @click="browseTab='surah'">{{tr.surahs}}</button>
-            <button class="tab" :class="{active:browseTab==='juz'}" @click="browseTab='juz'">{{tr.juz}}</button>
+          <div class="flex gap-1 p-1.5 bg-surface-2 border border-line rounded-full w-fit mb-3.5">
+            <button class="px-4 py-2 rounded-full text-xs whitespace-nowrap transition-colors" :class="browseTab==='surah'?'bg-surface text-gold shadow-sm font-semibold':'text-ink-3 font-medium'" @click="browseTab='surah'">{{tr.surahs}}</button>
+            <button class="px-4 py-2 rounded-full text-xs whitespace-nowrap transition-colors" :class="browseTab==='juz'?'bg-surface text-gold shadow-sm font-semibold':'text-ink-3 font-medium'" @click="browseTab='juz'">{{tr.juz}}</button>
           </div>
-          <div class="surahs" v-if="browseTab==='surah'">
-            <div class="surah" v-for="n in 114" :key="n" @click="loadSurah(n)">
-              <div class="n">{{n}}</div><div class="l">{{surahName(n)||tr.surah}}</div>
+          <div class="grid grid-cols-3 sm:grid-cols-4 gap-2.5" v-if="browseTab==='surah'">
+            <div class="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 cursor-pointer hover:border-gold/40 transition-colors" v-for="n in 114" :key="n" @click="loadSurah(n)">
+              <div class="font-display text-lg font-bold text-gold">{{n}}</div><div class="text-xs text-ink-2 truncate">{{surahName(n)||tr.surah}}</div>
             </div>
           </div>
-          <div class="surahs" v-else>
-            <div class="surah" v-for="n in 30" :key="'j'+n" @click="loadJuz(n)">
-              <div class="n">{{n}}</div><div class="l">{{tr.juz}}</div>
+          <div class="grid grid-cols-3 sm:grid-cols-5 gap-2.5" v-else>
+            <div class="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 cursor-pointer hover:border-gold/40 transition-colors" v-for="n in 30" :key="'j'+n" @click="loadJuz(n)">
+              <div class="font-display text-lg font-bold text-gold">{{n}}</div><div class="text-xs text-ink-2">{{tr.juz}}</div>
             </div>
           </div>
         </div>
         <div v-else>
-          <div class="browse-bar">
-            <button class="act" @click="browseSurah=null;browseJuz=null"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> {{tr.back}}</button>
-            <button class="act" :class="{on:surahPlaying}" @click="playSurah"><svg viewBox="0 0 24 24"><path v-if="surahPlaying" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg> {{surahPlaying?tr.stopSurah:tr.playSurah}}</button>
-            <span style="font-size:12px;color:var(--ink-3)">{{browseJuz?tr.juz+' '+browseJuz:tr.surah+' '+browseSurah}} · {{browseSurahData?.verses?.length||browseSurahData?.total_verses||0}} {{tr.verses}}</span>
+          <div class="flex items-center gap-2 flex-wrap mb-4">
+            <button class="flex items-center gap-1.5 text-xs text-ink-2 px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors" @click="browseSurah=null;browseJuz=null"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-none stroke-2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> {{tr.back}}</button>
+            <button class="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors" :class="surahPlaying?'text-gold':'text-ink-2'" @click="playSurah"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-current stroke-1"><path v-if="surahPlaying" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg> {{surahPlaying?tr.stopSurah:tr.playSurah}}</button>
+            <span class="text-xs text-ink-3">{{browseJuz?tr.juz+' '+browseJuz:tr.surah+' '+browseSurah}} · {{browseSurahData?.verses?.length||browseSurahData?.total_verses||0}} {{tr.verses}}</span>
           </div>
-          <div class="results">
+          <div class="flex flex-col gap-4">
             <verse-card v-for="bv in browseSurahData?.verses||[]" :key="(bv.surah||browseSurah)+':'+bv.ayah" :v="{surah:bv.surah||browseSurah,ayah:bv.ayah,text:bv.text,translation:bv.translation}"></verse-card>
           </div>
         </div>
       </template>
 
-      <!-- Search / Hadith -->
       <template v-else>
         <verse-card v-for="(r,i) in results" :key="i" :v="r" :idx="i"></verse-card>
       </template>
 
-      <div class="empty" v-if="!results.length && !qaAnswer && !countResult && !themes && searched && mode!=='analytics' && mode!=='browse'">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <h3>{{tr.nothing}}</h3>
-        <p>{{tr.tryOther}}</p>
+      <div class="text-center py-12 text-ink-3" v-if="!results.length && !qaAnswer && !countResult && !themes && searched && mode!=='analytics' && mode!=='browse'">
+        <svg viewBox="0 0 24 24" class="w-9 h-9 mx-auto stroke-current fill-none stroke-1 opacity-50"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <h3 class="font-display text-xl font-semibold text-ink-2 mt-3">{{tr.nothing}}</h3>
+        <p class="text-sm mt-1">{{tr.tryOther}}</p>
       </div>
     </div>
 
-    <div class="foot">نُور - &ldquo;light&rdquo; · meaning over keywords</div>
+    <div class="text-center text-xs text-ink-3 mt-16">نُور - &ldquo;light&rdquo; · meaning over keywords</div>
   </div>
 
-  <div class="toast" :class="{show:toast}">{{toast}}</div>
+  <div class="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl bg-ink text-bg text-sm font-medium shadow-lg transition-all duration-300 z-50" :class="toast?'opacity-100 translate-y-0':'opacity-0 translate-y-4 pointer-events-none'">{{toast}}</div>
 </div>
-
 <script>
 const{createApp,ref,computed,onMounted,onUnmounted,nextTick,provide,inject}=Vue
 
 const VerseCard={
   props:{v:Object,idx:{type:Number,default:0}},
-  setup(){return{...inject('ctx')}},
+  setup(){const studyOpen=ref(false);return{...inject('ctx'),studyOpen}},
   template:`
-  <div class="card" :style="{animationDelay:idx*40+'ms'}">
-    <div class="card-head">
-      <span class="ref" v-if="v.surah"><span class="ref-name" v-if="surahName(v.surah)">{{surahName(v.surah)}} </span>{{v.surah}}:{{v.ayah}}</span>
-      <span class="ref" v-else-if="v.collection"><span class="collection">{{v.collection}}</span> #{{v.hadith_number}}</span>
-      <span class="score" :class="scoreClass(v.score)" v-if="v.score">{{pct(v.score)}}</span>
+  <div class="rounded-2xl border border-line bg-surface p-5">
+    <div class="flex justify-between items-center gap-2 mb-3">
+      <span class="text-sm font-semibold text-gold" v-if="v.surah"><span class="text-ink-3 font-normal" v-if="surahName(v.surah)">{{surahName(v.surah)}} </span>{{v.surah}}:{{v.ayah}}</span>
+      <span class="text-sm font-semibold text-gold" v-else-if="v.collection"><span class="text-ink-2">{{v.collection}}</span> #{{v.hadith_number}}</span>
+      <span class="text-2xs px-2 py-0.5 rounded-full font-semibold" :class="scoreClass(v.score)" v-if="v.score">{{pct(v.score)}}</span>
     </div>
-    <div class="arabic" v-if="v.text && isArabic(v.text)">{{v.text}}</div>
-    <div class="hadith-text" v-else-if="v.text">{{v.text}}</div>
-    <div class="translation" v-if="v.translation">{{v.translation}}</div>
-    <div class="wbw" v-if="v.surah && verseWords[v.surah+':'+v.ayah]?.length">
-      <span class="wbw-w" v-for="(w,wi) in verseWords[v.surah+':'+v.ayah]" :key="wi"><span class="wbw-ar">{{w.ar}}</span><span class="wbw-en">{{w.en}}</span></span>
+    <div class="font-ar text-3xl leading-loose text-end text-ink" dir="rtl" v-if="v.text && isArabic(v.text)">{{v.text}}</div>
+    <div class="text-base leading-relaxed text-ink" v-else-if="v.text">{{v.text}}</div>
+    <div class="text-sm leading-relaxed text-ink-2 mt-2" v-if="v.translation">{{v.translation}}</div>
+    <div class="flex gap-1 mt-4 pt-3.5 border-t border-line flex-wrap" v-if="v.surah">
+      <button class="p-2 rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink transition-colors" @click="playAudio(v.surah,v.ayah)" :title="tr.listen"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 fill-current"><path v-if="playingVerse===v.surah+':'+v.ayah" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg></button>
+      <button class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors" :class="studyOpen?'bg-gold/10 text-gold':'text-ink-3 hover:bg-surface-2 hover:text-ink'" @click="studyOpen=!studyOpen"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 fill-current"><path d="M2 4.5A2.5 2.5 0 014.5 2H11v17.5a1.5 1.5 0 00-1.5-1.5H2zM22 4.5A2.5 2.5 0 0019.5 2H13v17.5a1.5 1.5 0 011.5-1.5H22z"/></svg> {{tr.study}}</button>
+      <button class="p-2 rounded-lg transition-colors" :class="isBookmarked(v)?'text-gold':'text-ink-3 hover:bg-surface-2 hover:text-ink'" @click="toggleBookmark(v)" :title="isBookmarked(v)?tr.saved:tr.save"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-none stroke-2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></button>
+      <button class="p-2 rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink transition-colors" @click="shareVerse(v)" :title="tr.share"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-none stroke-2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></button>
     </div>
-    <div class="inline-sec" v-if="v.surah && verseTafsir[v.surah+':'+v.ayah]!==undefined">
-      <div class="inline-label">{{tr.tafsir}} · Ibn Kathir</div>
-      <div v-if="verseTafsir[v.surah+':'+v.ayah]" class="inline-body">{{verseTafsir[v.surah+':'+v.ayah]}}</div>
-      <div v-else class="inline-loading"><span class="spinner"></span></div>
+    <div class="flex gap-1 mt-4 pt-3.5 border-t border-line" v-else-if="v.collection">
+      <button class="p-2 rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink transition-colors" @click="copy(v)" :title="tr.copy"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-none stroke-2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
+      <button class="p-2 rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink transition-colors" @click="shareVerse(v)" :title="tr.share"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-none stroke-2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></button>
     </div>
-    <div class="inline-sec" v-if="v.surah && verseTrans[v.surah+':'+v.ayah]!==undefined">
-      <div class="inline-label">{{tr.translations}}</div>
-      <div v-if="verseTrans[v.surah+':'+v.ayah]">
-        <div class="trans-row" v-for="(t,ti) in verseTrans[v.surah+':'+v.ayah]" :key="ti"><span class="trans-name">{{t.name}}</span>{{t.text}}</div>
+    <div class="mt-3.5 pt-3.5 border-t border-line" v-if="studyOpen && v.surah">
+      <div class="flex flex-wrap gap-1.5 mb-3">
+        <button class="px-3.5 py-1.5 rounded-full text-2xs font-medium border transition-colors" :class="verseWords[v.surah+':'+v.ayah]?.length?'bg-gold/10 text-gold border-gold/40':'text-ink-3 bg-surface-2 border-line hover:text-ink hover:border-gold/40'" @click="showWords(v.surah,v.ayah)">{{tr.words}}</button>
+        <button class="px-3.5 py-1.5 rounded-full text-2xs font-medium border transition-colors" :class="verseTafsir[v.surah+':'+v.ayah]!==undefined?'bg-gold/10 text-gold border-gold/40':'text-ink-3 bg-surface-2 border-line hover:text-ink hover:border-gold/40'" @click="toggleTafsir(v.surah,v.ayah)">{{tr.tafsir}}</button>
+        <button class="px-3.5 py-1.5 rounded-full text-2xs font-medium border transition-colors" :class="verseTrans[v.surah+':'+v.ayah]!==undefined?'bg-gold/10 text-gold border-gold/40':'text-ink-3 bg-surface-2 border-line hover:text-ink hover:border-gold/40'" @click="toggleTrans(v.surah,v.ayah)">{{tr.translations}}</button>
+        <button class="px-3.5 py-1.5 rounded-full text-2xs font-medium border transition-colors" :class="verseRelated[v.surah+':'+v.ayah]?.length?'bg-gold/10 text-gold border-gold/40':'text-ink-3 bg-surface-2 border-line hover:text-ink hover:border-gold/40'" @click="toggleRelated(v.surah,v.ayah)">{{tr.relatedH}}</button>
       </div>
-      <div v-else class="inline-loading"><span class="spinner"></span></div>
-    </div>
-    <div class="inline-sec" v-if="v.surah && verseRelated[v.surah+':'+v.ayah]?.length">
-      <div class="inline-label">{{tr.relatedH}}</div>
-      <div class="rel-v" v-for="(rv,ri) in verseRelated[v.surah+':'+v.ayah]" :key="ri" @click="goVerse(rv)">
-        <strong>{{rv.surah}}:{{rv.ayah}}</strong> <span>{{(rv.translation||'').slice(0,72)}}&hellip;</span>
+      <div class="flex flex-wrap gap-1.5 mb-3" dir="rtl" v-if="verseWords[v.surah+':'+v.ayah]?.length">
+        <span class="flex flex-col items-center bg-surface border border-gold/30 rounded-lg px-2.5 py-1.5 min-w-11" v-for="(w,wi) in verseWords[v.surah+':'+v.ayah]" :key="wi"><span class="font-ar text-xl leading-normal text-ink">{{w.ar}}</span><span class="text-2xs text-ink-3 mt-0.5" dir="ltr">{{w.en}}</span></span>
       </div>
-    </div>
-    <div class="actions" v-if="v.surah">
-      <button class="act ico" @click="playAudio(v.surah,v.ayah)" :title="tr.listen"><svg viewBox="0 0 24 24"><path v-if="playingVerse===v.surah+':'+v.ayah" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg></button>
-      <button class="act ico" :class="{on:verseWords[v.surah+':'+v.ayah]}" @click="showWords(v.surah,v.ayah)" :title="tr.words"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></button>
-      <button class="act ico" :class="{on:verseRelated[v.surah+':'+v.ayah]}" @click="toggleRelated(v.surah,v.ayah)" :title="tr.relatedH"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
-      <button class="act ico" :class="{on:verseTafsir[v.surah+':'+v.ayah]!==undefined}" @click="toggleTafsir(v.surah,v.ayah)" :title="tr.tafsir"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></button>
-      <button class="act ico" :class="{on:verseTrans[v.surah+':'+v.ayah]!==undefined}" @click="toggleTrans(v.surah,v.ayah)" :title="tr.translations"><svg viewBox="0 0 24 24"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg></button>
-      <button class="act ico" @click="copy(v)" :title="tr.copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
-      <button class="act ico" :class="{on:isBookmarked(v)}" @click="toggleBookmark(v)" :title="isBookmarked(v)?tr.saved:tr.save"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></button>
-      <button class="act ico" @click="shareVerse(v)" :title="tr.share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></button>
+      <div class="mt-3 p-3.5 bg-gold/10 border border-gold/30 rounded-xl" v-if="verseTafsir[v.surah+':'+v.ayah]!==undefined">
+        <div class="font-ui text-2xs text-gold uppercase tracking-widest mb-2">{{tr.tafsir}} · Ibn Kathir</div>
+        <div v-if="verseTafsir[v.surah+':'+v.ayah]" class="text-sm leading-relaxed text-ink-2">{{verseTafsir[v.surah+':'+v.ayah]}}</div>
+        <div v-else class="flex justify-center py-2"><span class="w-4 h-4 rounded-full border-2 border-gold border-t-transparent animate-spin"></span></div>
+      </div>
+      <div class="mt-3 p-3.5 bg-gold/10 border border-gold/30 rounded-xl" v-if="verseTrans[v.surah+':'+v.ayah]!==undefined">
+        <div class="font-ui text-2xs text-gold uppercase tracking-widest mb-2">{{tr.translations}}</div>
+        <div v-if="verseTrans[v.surah+':'+v.ayah]" class="flex flex-col gap-2">
+          <div class="text-sm leading-relaxed text-ink-2" v-for="(t,ti) in verseTrans[v.surah+':'+v.ayah]" :key="ti"><span class="text-2xs text-gold font-semibold me-2">{{t.name}}</span>{{t.text}}</div>
+        </div>
+        <div v-else class="flex justify-center py-2"><span class="w-4 h-4 rounded-full border-2 border-gold border-t-transparent animate-spin"></span></div>
+      </div>
+      <div class="mt-3 p-3.5 bg-gold/10 border border-gold/30 rounded-xl" v-if="verseRelated[v.surah+':'+v.ayah]?.length">
+        <div class="font-ui text-2xs text-gold uppercase tracking-widest mb-2">{{tr.relatedH}}</div>
+        <div class="text-sm text-ink-2 py-1.5 cursor-pointer hover:text-gold transition-colors" v-for="(rv,ri) in verseRelated[v.surah+':'+v.ayah]" :key="ri" @click="goVerse(rv)">
+          <strong class="text-gold">{{rv.surah}}:{{rv.ayah}}</strong> <span>{{(rv.translation||'').slice(0,72)}}&hellip;</span>
+        </div>
+      </div>
     </div>
   </div>`
 }
@@ -558,31 +309,34 @@ createApp({
     const lang=ref(localStorage.getItem('noor-lang')||'en')
     const ar=computed(()=>lang.value==='ar')
     const STR={
-      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',dailyVerse:'Verse of the day',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',translations:'Translations',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',share:'Share',playSurah:'Play surah',stopSurah:'Stop',juz:'Juz',back:'Back',switchLang:'العربية'},
-      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',dailyVerse:'آية اليوم',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',translations:'ترجمات',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',share:'مشاركة',playSurah:'تشغيل السورة',stopSurah:'إيقاف',juz:'جزء',back:'رجوع',switchLang:'English'},
+      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',dailyVerse:'Verse of the day',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',translations:'Translations',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',share:'Share',study:'Study',sourceQuran:'Qur’an',sourceHadith:'Hadith',explore:'Explore',playSurah:'Play surah',stopSurah:'Stop',juz:'Juz',back:'Back',switchLang:'العربية'},
+      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',dailyVerse:'آية اليوم',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',translations:'ترجمات',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',share:'مشاركة',study:'دراسة',sourceQuran:'قرآن',sourceHadith:'حديث',explore:'استكشاف',playSurah:'تشغيل السورة',stopSurah:'إيقاف',juz:'جزء',back:'رجوع',switchLang:'English'},
     }
     const tr=computed(()=>STR[lang.value])
 
     const isIndexingError=computed(()=>error.value&&error.value.includes('index'))
 
-    const modes=[
-      {id:'search',label:'Search',labelAr:'بحث',placeholder:"Search the Qur'an…",placeholderAr:'ابحث في القرآن…',hasSearch:true},
-      {id:'hadith',label:'Hadith',labelAr:'حديث',placeholder:'Search hadith collections…',placeholderAr:'ابحث في كتب الحديث…',hasSearch:true},
-      {id:'qa',label:'Q&A',labelAr:'سؤال وجواب',placeholder:'Ask a question…',placeholderAr:'اطرح سؤالًا…',hasSearch:true},
-      {id:'reflect',label:'Reflect',labelAr:'تأمل',placeholder:'How are you feeling? e.g. anxious, grateful, lost',placeholderAr:'بماذا تشعر؟ قلق، امتنان، حيرة…',hasSearch:true},
+    const intents=[
+      {id:'search',label:'Search',labelAr:'بحث',placeholder:'Search by meaning…',placeholderAr:'ابحث بالمعنى…',hasSearch:true},
+      {id:'qa',label:'Ask',labelAr:'اسأل',placeholder:'Ask a question…',placeholderAr:'اطرح سؤالًا…',hasSearch:true},
+      {id:'reflect',label:'Reflect',labelAr:'تأمل',placeholder:'How are you feeling?',placeholderAr:'بماذا تشعر؟',hasSearch:true},
       {id:'count',label:'Count',labelAr:'إحصاء',placeholder:'Count a word…',placeholderAr:'أحصِ كلمة…',hasSearch:true},
+    ]
+    const explores=[
       {id:'browse',label:'Browse',labelAr:'تصفّح',hasSearch:false},
       {id:'themes',label:'Themes',labelAr:'المواضيع',hasSearch:false},
       {id:'analytics',label:'Analytics',labelAr:'إحصائيات',hasSearch:false},
     ]
-
+    const modes=[...intents,...explores]
+    const source=ref('quran')
+    const exploring=computed(()=>explores.some(e=>e.id===mode.value))
     const currentMode=computed(()=>modes.find(m=>m.id===mode.value)||modes[0])
 
     const suggestions=[
       {label:'Mercy',labelAr:'الرحمة',q:'mercy'},{label:'Patience',labelAr:'الصبر',q:'patience'},
       {label:'Ayatul Kursi',labelAr:'آية الكرسي',q:'2:255'},{label:'Why pray?',labelAr:'لماذا نصلّي؟',q:'Why is prayer important in Islam?',mode:'qa'},
       {label:'Paradise',labelAr:'الجنة',q:'paradise'},{label:'Forgiveness',labelAr:'المغفرة',q:'forgiveness'},
-      {label:'Prophet',labelAr:'النبي محمد',q:'Prophet Muhammad',mode:'hadith'},
+      {label:'Prophet',labelAr:'النبي محمد',q:'Prophet Muhammad',source:'hadith'},
       {label:'Justice',labelAr:'العدل',q:'justice'},{label:'Knowledge',labelAr:'العلم',q:'knowledge'},
       {label:'Ramadan',labelAr:'رمضان',q:'Ramadan fasting'},{label:'Angels',labelAr:'الملائكة',q:'angels'},
     ]
@@ -603,7 +357,7 @@ createApp({
     function isArabic(t){return t&&/[؀-ۿ]/.test(t)}
     function pct(s){return s!=null?Math.round(s*100)+'%':''}
     function fmt(n){return n!=null?Number(n).toLocaleString():'0'}
-    function scoreClass(s){return s>0.75?'s-high':s>0.5?'s-med':'s-low'}
+    function scoreClass(s){return s>0.75?'bg-emerald/10 text-emerald':s>0.5?'bg-gold/10 text-gold':'bg-surface-2 text-ink-3'}
     function mdLite(t){
       const e=String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
       return e.replace(/^#{1,6}\s*(.+)$/gm,'<strong>$1</strong>')
@@ -714,6 +468,7 @@ createApp({
       else if(m.id==='browse'){browseSurah.value=null;browseJuz.value=null;browseSurahData.value=null}
       else nextTick(()=>searchInput.value?.focus())
     }
+    function toggleExplore(){switchMode(exploring.value?intents[0]:explores[0])}
 
     let mediaRecorder=null,audioChunks=[]
     async function toggleMic(){
@@ -747,13 +502,10 @@ createApp({
         const sf=surahFilter.value||null
         switch(mode.value){
           case 'search':
-            data=await post(`${API}/search`,{query:q,limit:20,surah_filter:sf})
+            data=source.value==='hadith'
+              ?await post(`${API}/hadith/search`,{query:q,limit:20})
+              :await post(`${API}/search`,{query:q,limit:20,surah_filter:sf})
             if(data.indexing){error.value=`Building search index… (${data.progress||'please wait'})`;break}
-            results.value=data.results||[]
-            break
-          case 'hadith':
-            data=await post(`${API}/hadith/search`,{query:q,limit:20})
-            if(data.indexing){error.value=`Building hadith index… (${data.progress||'please wait'})`;break}
             results.value=data.results||[]
             break
           case 'qa':
@@ -898,11 +650,11 @@ createApp({
     provide('ctx',{tr,ar,isArabic,pct,scoreClass,surahName,playingVerse,playAudio,verseWords,showWords,verseRelated,toggleRelated,verseTafsir,toggleTafsir,verseTrans,toggleTrans,goVerse,copy,shareVerse,isBookmarked,toggleBookmark})
 
     return{
-      query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
+      query,mode,modes,intents,explores,source,exploring,currentMode,loading,error,results,qaAnswer,countResult,themes,
       stats,toast,searched,suggestions,chips,searchInput,surahFilter,surahName,dailyVerse,onlineSearch,playingVerse,playAudio,showBookmarks,bookmarks,
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
       dark,toggleTheme,lang,ar,tr,toggleLang,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
-      switchMode,search,loadSurah,loadJuz,browseTab,browseJuz,copy,shareVerse,toggleMic,recording,verseWords,showWords,surahPlaying,playSurah,
+      switchMode,toggleExplore,search,loadSurah,loadJuz,browseTab,browseJuz,copy,shareVerse,toggleMic,recording,verseWords,showWords,surahPlaying,playSurah,
       isBookmarked,toggleBookmark,removeBookmark,saveBookmarks,showToast
     }
   }

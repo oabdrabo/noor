@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@font-face{font-family:"Amiri";font-weight:400;font-display:swap;src:url("/assets/fonts/amiri-arabic-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Amiri";font-weight:700;font-display:swap;src:url("/assets/fonts/amiri-arabic-700-normal.woff2") format("woff2")}
+@font-face{font-family:"Cormorant Garamond";font-weight:500;font-display:swap;src:url("/assets/fonts/cormorant-garamond-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Cormorant Garamond";font-weight:600;font-display:swap;src:url("/assets/fonts/cormorant-garamond-latin-600-normal.woff2") format("woff2")}
+@font-face{font-family:"Cormorant Garamond";font-weight:700;font-display:swap;src:url("/assets/fonts/cormorant-garamond-latin-700-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-weight:400;font-display:swap;src:url("/assets/fonts/inter-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-weight:500;font-display:swap;src:url("/assets/fonts/inter-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-weight:600;font-display:swap;src:url("/assets/fonts/inter-latin-600-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-weight:700;font-display:swap;src:url("/assets/fonts/inter-latin-700-normal.woff2") format("woff2")}
+
+@theme {
+  --color-bg: #f6f1e7;
+  --color-bg-deep: #ece3d2;
+  --color-surface: #fffdf8;
+  --color-surface-2: #f3ecdc;
+  --color-ink: #2a251d;
+  --color-ink-2: #6f6657;
+  --color-ink-3: #a89e8b;
+  --color-gold: #a07d2c;
+  --color-gold-soft: #bb9540;
+  --color-emerald: #0d6a4c;
+  --color-danger: #b4452f;
+  --color-line: #2a251d1a;
+  --color-line-2: #2a251d2b;
+  --font-ui: "Inter", system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-ar: "Amiri", "Scheherazade New", serif;
+  --text-2xs: 0.6875rem;
+  --ease-noor: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-theme="dark"] {
+  --color-bg: #14120c;
+  --color-bg-deep: #0d0b07;
+  --color-surface: #1d1a12;
+  --color-surface-2: #27231a;
+  --color-ink: #ece4d3;
+  --color-ink-2: #b3a892;
+  --color-ink-3: #7c745f;
+  --color-gold: #d9b56b;
+  --color-gold-soft: #ecca8b;
+  --color-emerald: #41b088;
+  --color-danger: #e07a63;
+  --color-line: #ffffff14;
+  --color-line-2: #ffffff26;
+}

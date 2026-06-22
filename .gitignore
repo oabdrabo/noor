@@ -10,3 +10,6 @@ venv/
 *.db
 /data/*
 !/data/*.json
+
+node_modules/
+src/build-tmp/
