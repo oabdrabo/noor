@@ -351,11 +351,43 @@ def _index_hadith(state, stop):
         logger.info("Hadith index complete (%d)", total)
 
 
+@lru_cache(maxsize=1)
+def _load_uthmani():
+    """Canonical Uthmani verse text (verse_key -> text) from data/quran-uthmani.json."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "quran-uthmani.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning("Uthmani map unavailable (%s) - verse text left as-is", e)
+        return {}
+
+
+def _canonicalize_quran_text(db):
+    """Rewrite the display Arabic to canonical Uthmani. The bundled dataset encodes the sukun as
+    U+06E1 and omits the kashida under the dagger alef, so the tashkeel renders in the wrong shape;
+    the canonical text fixes the mark shapes. Display-only, idempotent, no re-embedding (diacritics
+    barely move the multilingual-e5 vectors, so the existing index stays valid)."""
+    sample = db.execute("SELECT text FROM quran_metadata WHERE surah=1 AND ayah=1").fetchone()
+    if not sample or "ۡ" not in (sample[0] or ""):
+        return  # already canonical (or not yet indexed) -> nothing to do
+    uth = _load_uthmani()
+    if not uth:
+        return
+    rows = db.execute("SELECT verse_id, surah, ayah FROM quran_metadata").fetchall()
+    updates = [(uth[k], vid) for vid, s, a in rows if (k := f"{s}:{a}") in uth]
+    if updates:
+        db.executemany("UPDATE quran_metadata SET text=? WHERE verse_id=?", updates)
+        db.commit()
+        logger.info("Canonicalized %d Quran verses to Uthmani display text", len(updates))
+
+
 def _index_all(state, stop):
     try:
         _index_quran(state, stop)
         if stop.is_set():
             return
+        _canonicalize_quran_text(state.db)
         _index_hadith(state, stop)
         if not stop.is_set():
             state.index_progress = "Ready"
