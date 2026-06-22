@@ -102,7 +102,9 @@ QA_SYSTEM = (
     "Ground every statement in those passages and cite each with its bracketed reference, e.g. [2:255] "
     "or [Sahih Bukhari 1]. If the passages do not address the question, say so plainly. Do not issue "
     "legal rulings; report what the sources say and suggest consulting a qualified scholar for rulings. "
-    "Answer in the language of the question, in at most three short paragraphs. Write in plain prose with "
+    "Answer in BOTH Arabic and English: give the answer in Arabic first under a line that reads "
+    "'العربية', then the same answer in English under a line that reads 'English'. Keep each language to "
+    "at most three short paragraphs, grounded in the same cited passages. Write in plain prose with "
     "ordinary punctuation (commas, periods, hyphens); never use em-dashes or en-dashes."
 )
 

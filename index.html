@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-  <script>document.documentElement.dataset.theme=localStorage.getItem('noor-theme')||'light'</script>
+  <script>document.documentElement.dataset.theme=localStorage.getItem('noor-theme')||'light';(function(){var l=localStorage.getItem('noor-lang')||'en';document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr'})()</script>
   <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -262,9 +262,10 @@
       <div class="brand-ar">&#1606;&#1608;&#1585;</div>
       <div class="brand-en">Noor</div>
       <div class="ornament"><svg viewBox="0 0 24 24"><path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z"/></svg></div>
-      <p class="tagline">Semantic search · Qur'an &amp; Hadith</p>
+      <p class="tagline">{{tr.tagline}}</p>
       <div class="header-actions">
-        <button class="icon-btn" @click="toggleTheme" :title="dark?'Light mode':'Dark mode'">
+        <button class="icon-btn" @click="toggleLang" :title="tr.switchLang" style="font-family:var(--ui);font-size:12.5px;font-weight:700;letter-spacing:.5px">{{ar?'EN':'ع'}}</button>
+        <button class="icon-btn" @click="toggleTheme" :title="dark?tr.lightMode:tr.darkMode">
           <svg v-if="dark" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
           <svg v-else viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
         </button>
@@ -276,13 +277,13 @@
     </header>
 
     <div class="status" v-if="stats">
-      <span class="s"><span class="dot" :class="stats.status==='Ready'?'ready':'load'"></span> <strong>{{fmt(stats.indexed_verses)}}</strong> verses</span>
-      <span class="s"><strong>{{fmt(stats.total_hadiths)}}</strong> hadith</span>
+      <span class="s"><span class="dot" :class="stats.status==='Ready'?'ready':'load'"></span> <strong>{{fmt(stats.indexed_verses)}}</strong> {{tr.verses}}</span>
+      <span class="s"><strong>{{fmt(stats.total_hadiths)}}</strong> {{tr.hadith}}</span>
       <span class="pill" :class="stats.status==='Ready'?'ready':'load'">{{stats.status}}</span>
     </div>
 
     <div class="bm" v-if="showBookmarks">
-      <h3><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> Bookmarks ({{bookmarks.length}})</h3>
+      <h3><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{tr.bookmarks}} ({{bookmarks.length}})</h3>
       <div v-if="bookmarks.length">
         <div class="bm-item" v-for="(b,i) in bookmarks" :key="b.ref">
           <span style="cursor:pointer" @click="query=b.ref;mode='search';search()">
@@ -294,17 +295,17 @@
           </button>
         </div>
       </div>
-      <div class="bm-empty" v-else>No bookmarks yet - save a verse to keep it here.</div>
+      <div class="bm-empty" v-else>{{tr.noBookmarks}}</div>
     </div>
 
     <div class="tabs">
-      <button class="tab" :class="{active:mode===m.id}" v-for="m in modes" :key="m.id" @click="switchMode(m)">{{m.label}}</button>
+      <button class="tab" :class="{active:mode===m.id}" v-for="m in modes" :key="m.id" @click="switchMode(m)">{{ar?m.labelAr:m.label}}</button>
     </div>
 
     <div class="search-wrap" v-if="currentMode.hasSearch!==false">
       <div class="search-box">
-        <input ref="searchInput" v-model="query" :placeholder="currentMode.placeholder" :dir="isArabic(query)?'rtl':'ltr'" @keydown.enter="search" @keydown.escape="query=''">
-        <button class="mic-btn" :class="{rec:recording}" @click="toggleMic" :title="recording?'Stop recording':'Voice search'">
+        <input ref="searchInput" v-model="query" :placeholder="ar?currentMode.placeholderAr:currentMode.placeholder" :dir="isArabic(query)?'rtl':'ltr'" @keydown.enter="search" @keydown.escape="query=''">
+        <button class="mic-btn" :class="{rec:recording}" @click="toggleMic" :title="recording?tr.stopRec:tr.voice">
           <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
         </button>
         <button class="go-btn" @click="search" :disabled="loading">
@@ -315,16 +316,16 @@
 
     <div class="filters" v-if="mode==='search' && searched">
       <select class="filter-select" v-model.number="surahFilter" @change="search()">
-        <option :value="0">All Surahs</option>
-        <option v-for="n in 114" :value="n">Surah {{n}}</option>
+        <option :value="0">{{tr.allSurahs}}</option>
+        <option v-for="n in 114" :value="n">{{tr.surah}} {{n}}</option>
       </select>
-      <span class="filter-count" v-if="results.length">{{results.length}} results</span>
+      <span class="filter-count" v-if="results.length">{{results.length}} {{tr.results}}</span>
     </div>
 
     <div v-if="!results.length && !loading && !searched && currentMode.hasSearch!==false">
-      <div class="chips-label">Try</div>
+      <div class="chips-label">{{tr.tryLabel}}</div>
       <div class="chips">
-        <button class="chip" v-for="s in suggestions" :key="s.q" @click="query=s.q;mode=s.mode||'search';search()">{{s.label}}</button>
+        <button class="chip" v-for="s in suggestions" :key="s.q" @click="query=s.q;mode=s.mode||'search';search()">{{ar?s.labelAr:s.label}}</button>
       </div>
     </div>
 
@@ -342,10 +343,10 @@
       <!-- Q&A -->
       <template v-if="mode==='qa' && qaAnswer">
         <div class="qa" v-if="qaAnswer.answer">
-          <div class="qa-label">Answer · grounded in {{qaAnswer.citations?.length||0}} sources</div>
+          <div class="qa-label">{{tr.answer}} · {{tr.groundedIn}} {{qaAnswer.citations?.length||0}} {{tr.sources}}</div>
           <div class="qa-body" v-html="mdLite(qaAnswer.answer)"></div>
         </div>
-        <div class="sources-label" v-if="qaAnswer.citations?.length">Sources</div>
+        <div class="sources-label" v-if="qaAnswer.citations?.length">{{tr.sourcesH}}</div>
         <div class="card" v-for="(r,i) in qaAnswer.citations" :key="i" :style="{animationDelay:i*50+'ms'}">
           <div class="card-head">
             <span class="ref" v-if="r.surah">{{r.surah}}:{{r.ayah}}</span>
@@ -362,7 +363,7 @@
       <template v-else-if="mode==='count' && countResult">
         <div class="count">
           <div class="n">{{fmt(countResult.count)}}</div>
-          <div class="l">&ldquo;{{countResult.word}}&rdquo; appears in {{fmt(countResult.total_verses_with_word)}} verses</div>
+          <div class="l">&ldquo;{{countResult.word}}&rdquo; {{tr.appearsIn}} {{fmt(countResult.total_verses_with_word)}} {{tr.inVerses}}</div>
         </div>
         <div class="card" v-for="(e,i) in countResult.examples" :key="i" :style="{animationDelay:i*40+'ms'}">
           <div class="card-head">
@@ -377,8 +378,8 @@
       <template v-else-if="mode==='themes' && themes">
         <div class="grid">
           <div class="theme-card" v-for="(t,id) in themes" :key="id">
-            <div class="theme-title">Theme {{Number(id)+1}}</div>
-            <div class="theme-size">{{t.size}} verses</div>
+            <div class="theme-title">{{tr.theme}} {{Number(id)+1}}</div>
+            <div class="theme-size">{{t.size}} {{tr.verses}}</div>
             <div class="kw"><span v-for="k in t.keywords" :key="k">{{k}}</span></div>
           </div>
         </div>
@@ -387,12 +388,12 @@
       <!-- Analytics -->
       <template v-else-if="mode==='analytics'">
         <div class="stats-grid" v-if="analyticsData">
-          <div class="stat"><div class="n">{{fmt(analyticsData.surah?.total_surahs||114)}}</div><div class="l">Surahs</div></div>
-          <div class="stat"><div class="n">{{fmt(analyticsData.surah?.total_verses||0)}}</div><div class="l">Verses</div></div>
-          <div class="stat"><div class="n">{{analyticsData.surah?.average_verses_per_surah||0}}</div><div class="l">Avg / Surah</div></div>
-          <div class="stat"><div class="n">{{fmt(analyticsData.frequency?.total_unique_words||0)}}</div><div class="l">Unique Words</div></div>
+          <div class="stat"><div class="n">{{fmt(analyticsData.surah?.total_surahs||114)}}</div><div class="l">{{tr.surahs}}</div></div>
+          <div class="stat"><div class="n">{{fmt(analyticsData.surah?.total_verses||0)}}</div><div class="l">{{tr.versesC}}</div></div>
+          <div class="stat"><div class="n">{{analyticsData.surah?.average_verses_per_surah||0}}</div><div class="l">{{tr.avgSurah}}</div></div>
+          <div class="stat"><div class="n">{{fmt(analyticsData.frequency?.total_unique_words||0)}}</div><div class="l">{{tr.uniqueWords}}</div></div>
         </div>
-        <h3 class="section-h" v-if="distribution">Theme Distribution</h3>
+        <h3 class="section-h" v-if="distribution">{{tr.themeDist}}</h3>
         <div v-if="distribution" style="margin-bottom:26px">
           <div class="dist" v-for="(val,theme) in distribution" :key="theme">
             <div class="lbl">{{theme}}</div>
@@ -401,7 +402,7 @@
           </div>
         </div>
         <div v-if="wordcloudImg">
-          <h3 class="section-h">Word Cloud</h3>
+          <h3 class="section-h">{{tr.wordCloud}}</h3>
           <img :src="wordcloudImg" class="wc" alt="Word cloud">
         </div>
       </template>
@@ -411,14 +412,14 @@
         <div v-if="!browseSurah">
           <div class="surahs">
             <div class="surah" v-for="n in 114" :key="n" @click="loadSurah(n)">
-              <div class="n">{{n}}</div><div class="l">Surah</div>
+              <div class="n">{{n}}</div><div class="l">{{tr.surah}}</div>
             </div>
           </div>
         </div>
         <div v-else>
           <div class="browse-bar">
-            <button class="act" @click="browseSurah=null"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> All surahs</button>
-            <span style="font-size:12px;color:var(--ink-3)">Surah {{browseSurah}} · {{browseSurahData?.total_verses}} verses</span>
+            <button class="act" @click="browseSurah=null"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> {{tr.allSurahsBtn}}</button>
+            <span style="font-size:12px;color:var(--ink-3)">{{tr.surah}} {{browseSurah}} · {{browseSurahData?.total_verses}} {{tr.verses}}</span>
           </div>
           <div class="results">
             <div class="card" v-for="v in browseSurahData?.verses||[]" :key="v.ayah" :style="{animationDelay:Math.min(v.ayah*18,300)+'ms'}">
@@ -426,10 +427,10 @@
               <div class="arabic" v-if="v.text">{{v.text}}</div>
               <div class="translation" v-if="v.translation">{{v.translation}}</div>
               <div class="actions">
-                <button class="act" @click="copy({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button>
-                <button class="act" :class="{on:isBookmarked({surah:browseSurah,ayah:v.ayah})}" @click="toggleBookmark({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> Save</button>
-                <button class="act" @click="query=v.translation||v.text;mode='search';search()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Similar</button>
-                <button class="act" @click="shareVerse({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> Share</button>
+                <button class="act" @click="copy({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> {{tr.copy}}</button>
+                <button class="act" :class="{on:isBookmarked({surah:browseSurah,ayah:v.ayah})}" @click="toggleBookmark({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{tr.save}}</button>
+                <button class="act" @click="query=v.translation||v.text;mode='search';search()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> {{tr.similar}}</button>
+                <button class="act" @click="shareVerse({surah:browseSurah,ayah:v.ayah,text:v.text,translation:v.translation})"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> {{tr.share}}</button>
               </div>
             </div>
           </div>
@@ -448,18 +449,18 @@
           <div class="hadith-text" v-else-if="r.text">{{r.text}}</div>
           <div class="translation" v-if="r.translation">{{r.translation}}</div>
           <div class="actions">
-            <button class="act" @click="copy(r)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button>
-            <button class="act" :class="{on:isBookmarked(r)}" v-if="r.surah" @click="toggleBookmark(r)"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{isBookmarked(r)?'Saved':'Save'}}</button>
-            <button class="act" v-if="r.surah" @click="query=r.translation||r.text;mode='search';search()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Similar</button>
-            <button class="act" @click="shareVerse(r)"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> Share</button>
+            <button class="act" @click="copy(r)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> {{tr.copy}}</button>
+            <button class="act" :class="{on:isBookmarked(r)}" v-if="r.surah" @click="toggleBookmark(r)"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> {{isBookmarked(r)?tr.saved:tr.save}}</button>
+            <button class="act" v-if="r.surah" @click="query=r.translation||r.text;mode='search';search()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> {{tr.similar}}</button>
+            <button class="act" @click="shareVerse(r)"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg> {{tr.share}}</button>
           </div>
         </div>
       </template>
 
       <div class="empty" v-if="!results.length && !qaAnswer && !countResult && !themes && searched && mode!=='analytics' && mode!=='browse'">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <h3>Nothing found</h3>
-        <p>Try different words, or another mode.</p>
+        <h3>{{tr.nothing}}</h3>
+        <p>{{tr.tryOther}}</p>
       </div>
     </div>
 
@@ -497,28 +498,35 @@ createApp({
     const browseSurah=ref(null)
     const browseSurahData=ref(null)
     const dark=ref(document.documentElement.dataset.theme==='dark')
+    const lang=ref(localStorage.getItem('noor-lang')||'en')
+    const ar=computed(()=>lang.value==='ar')
+    const STR={
+      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',copy:'Copy',save:'Save',saved:'Saved',similar:'Similar',share:'Share',allSurahsBtn:'All surahs',switchLang:'العربية'},
+      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',copy:'نسخ',save:'حفظ',saved:'محفوظ',similar:'مشابه',share:'مشاركة',allSurahsBtn:'كل السور',switchLang:'English'},
+    }
+    const tr=computed(()=>STR[lang.value])
 
     const isIndexingError=computed(()=>error.value&&error.value.includes('index'))
 
     const modes=[
-      {id:'search',label:'Search',placeholder:"Search the Qur'an…",hasSearch:true},
-      {id:'hadith',label:'Hadith',placeholder:'Search hadith collections…',hasSearch:true},
-      {id:'qa',label:'Q&A',placeholder:'Ask a question…',hasSearch:true},
-      {id:'count',label:'Count',placeholder:'Count a word…',hasSearch:true},
-      {id:'browse',label:'Browse',hasSearch:false},
-      {id:'themes',label:'Themes',hasSearch:false},
-      {id:'analytics',label:'Analytics',hasSearch:false},
+      {id:'search',label:'Search',labelAr:'بحث',placeholder:"Search the Qur'an…",placeholderAr:'ابحث في القرآن…',hasSearch:true},
+      {id:'hadith',label:'Hadith',labelAr:'حديث',placeholder:'Search hadith collections…',placeholderAr:'ابحث في كتب الحديث…',hasSearch:true},
+      {id:'qa',label:'Q&A',labelAr:'سؤال وجواب',placeholder:'Ask a question…',placeholderAr:'اطرح سؤالًا…',hasSearch:true},
+      {id:'count',label:'Count',labelAr:'إحصاء',placeholder:'Count a word…',placeholderAr:'أحصِ كلمة…',hasSearch:true},
+      {id:'browse',label:'Browse',labelAr:'تصفّح',hasSearch:false},
+      {id:'themes',label:'Themes',labelAr:'المواضيع',hasSearch:false},
+      {id:'analytics',label:'Analytics',labelAr:'إحصائيات',hasSearch:false},
     ]
 
     const currentMode=computed(()=>modes.find(m=>m.id===mode.value)||modes[0])
 
     const suggestions=[
-      {label:'Mercy',q:'mercy'},{label:'Patience',q:'patience'},
-      {label:'Ayatul Kursi',q:'2:255'},{label:'Why pray?',q:'Why is prayer important in Islam?',mode:'qa'},
-      {label:'Paradise',q:'paradise'},{label:'Forgiveness',q:'forgiveness'},
-      {label:'Prophet',q:'Prophet Muhammad',mode:'hadith'},
-      {label:'Justice',q:'justice'},{label:'Knowledge',q:'knowledge'},
-      {label:'Ramadan',q:'Ramadan fasting'},{label:'Angels',q:'angels'},
+      {label:'Mercy',labelAr:'الرحمة',q:'mercy'},{label:'Patience',labelAr:'الصبر',q:'patience'},
+      {label:'Ayatul Kursi',labelAr:'آية الكرسي',q:'2:255'},{label:'Why pray?',labelAr:'لماذا نصلّي؟',q:'Why is prayer important in Islam?',mode:'qa'},
+      {label:'Paradise',labelAr:'الجنة',q:'paradise'},{label:'Forgiveness',labelAr:'المغفرة',q:'forgiveness'},
+      {label:'Prophet',labelAr:'النبي محمد',q:'Prophet Muhammad',mode:'hadith'},
+      {label:'Justice',labelAr:'العدل',q:'justice'},{label:'Knowledge',labelAr:'العلم',q:'knowledge'},
+      {label:'Ramadan',labelAr:'رمضان',q:'Ramadan fasting'},{label:'Angels',labelAr:'الملائكة',q:'angels'},
     ]
 
     const distColors=['#a07d2c','#0d6a4c','#5c6fa0','#b8923a','#3f9e7c','#9a6fb0','#b06a5a','#5c9aa0']
@@ -548,6 +556,13 @@ createApp({
       const t=dark.value?'dark':'light'
       document.documentElement.dataset.theme=t
       localStorage.setItem('noor-theme',t)
+    }
+
+    function toggleLang(){
+      lang.value=ar.value?'en':'ar'
+      localStorage.setItem('noor-lang',lang.value)
+      document.documentElement.lang=lang.value
+      document.documentElement.dir=ar.value?'rtl':'ltr'
     }
 
     function switchMode(m){
@@ -703,7 +718,7 @@ createApp({
       query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
       stats,toast,searched,suggestions,searchInput,surahFilter,showBookmarks,bookmarks,
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
-      dark,toggleTheme,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
+      dark,toggleTheme,lang,ar,tr,toggleLang,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
       switchMode,search,loadSurah,copy,shareVerse,toggleMic,recording,
       isBookmarked,toggleBookmark,removeBookmark,showToast
     }
