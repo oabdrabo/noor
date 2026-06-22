@@ -765,6 +765,31 @@ def tafsir(surah: int, ayah: int, request: Request):
     return {"tafsir": _fetch_tafsir(f"{surah}:{ayah}")}
 
 
+@lru_cache(maxsize=1)
+def _chapters():
+    req = urllib.request.Request(
+        "https://api.quran.com/api/v4/chapters",
+        headers={"User-Agent": "noor/1.0 (+https://noor.pyxis3.ai)"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return [
+        {"id": c["id"], "en": c.get("name_simple", ""), "ar": c.get("name_arabic", "")}
+        for c in data.get("chapters", [])
+    ]
+
+
+@app.get("/api/chapters")
+def chapters(request: Request):
+    """Surah names (English + Arabic) from Quran.com, for the browse list + card refs."""
+    _rate_limit(request, 40)
+    try:
+        return {"chapters": _chapters()}
+    except Exception as e:
+        logger.error("chapters fetch failed: %s", e)
+        return {"chapters": []}
+
+
 @app.get("/api/analytics/surah")
 def surah_analytics(request: Request):
     df = request.app.state.df_verses

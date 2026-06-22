@@ -340,7 +340,7 @@
     <div class="filters" v-if="mode==='search' && searched">
       <select class="filter-select" v-model.number="surahFilter" @change="search()">
         <option :value="0">{{tr.allSurahs}}</option>
-        <option v-for="n in 114" :value="n">{{tr.surah}} {{n}}</option>
+        <option v-for="n in 114" :value="n">{{n}}. {{surahName(n)||tr.surah+' '+n}}</option>
       </select>
       <span class="filter-count" v-if="results.length">{{results.length}} {{tr.results}}</span>
     </div>
@@ -420,7 +420,7 @@
         <div v-if="!browseSurah">
           <div class="surahs">
             <div class="surah" v-for="n in 114" :key="n" @click="loadSurah(n)">
-              <div class="n">{{n}}</div><div class="l">{{tr.surah}}</div>
+              <div class="n">{{n}}</div><div class="l">{{surahName(n)||tr.surah}}</div>
             </div>
           </div>
         </div>
@@ -462,7 +462,7 @@ const VerseCard={
   template:`
   <div class="card" :style="{animationDelay:idx*40+'ms'}">
     <div class="card-head">
-      <span class="ref" v-if="v.surah">{{v.surah}}:{{v.ayah}}</span>
+      <span class="ref" v-if="v.surah"><span class="ref-name" v-if="surahName(v.surah)">{{surahName(v.surah)}} </span>{{v.surah}}:{{v.ayah}}</span>
       <span class="ref" v-else-if="v.collection"><span class="collection">{{v.collection}}</span> #{{v.hadith_number}}</span>
       <span class="score" :class="scoreClass(v.score)" v-if="v.score">{{pct(v.score)}}</span>
     </div>
@@ -512,6 +512,8 @@ createApp({
     const searchInput=ref(null)
     const recording=ref(false)
     const surahFilter=ref(0)
+    const chapters=ref({})
+    function surahName(n){const c=chapters.value[n];return c?(ar.value?c.ar:c.en):''}
     const onlineSearch=ref(false)
     const playingVerse=ref(null)
     const verseWords=ref({})
@@ -805,15 +807,16 @@ createApp({
     onMounted(async()=>{
       document.addEventListener('keydown',onKeydown)
       try{stats.value=await get(`${API}/stats`)}catch(e){}
+      try{const d=await get(`${API}/chapters`);const m={};(d.chapters||[]).forEach(c=>m[c.id]=c);chapters.value=m}catch(e){}
       nextTick(()=>searchInput.value?.focus())
     })
     onUnmounted(()=>document.removeEventListener('keydown',onKeydown))
 
-    provide('ctx',{tr,ar,isArabic,pct,scoreClass,playingVerse,playAudio,verseWords,showWords,verseRelated,toggleRelated,verseTafsir,toggleTafsir,goVerse,copy,shareVerse,isBookmarked,toggleBookmark})
+    provide('ctx',{tr,ar,isArabic,pct,scoreClass,surahName,playingVerse,playAudio,verseWords,showWords,verseRelated,toggleRelated,verseTafsir,toggleTafsir,goVerse,copy,shareVerse,isBookmarked,toggleBookmark})
 
     return{
       query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
-      stats,toast,searched,suggestions,chips,searchInput,surahFilter,onlineSearch,playingVerse,playAudio,showBookmarks,bookmarks,
+      stats,toast,searched,suggestions,chips,searchInput,surahFilter,surahName,onlineSearch,playingVerse,playAudio,showBookmarks,bookmarks,
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
       dark,toggleTheme,lang,ar,tr,toggleLang,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
       switchMode,search,showRelated,loadSurah,copy,shareVerse,toggleMic,recording,verseWords,showWords,
