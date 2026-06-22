@@ -331,7 +331,7 @@
     <div v-if="!results.length && !loading && !searched && currentMode.hasSearch!==false">
       <div class="chips-label">{{tr.tryLabel}}</div>
       <div class="chips">
-        <button class="chip" v-for="s in suggestions" :key="s.q" @click="query=s.q;mode=s.mode||'search';search()">{{ar?s.labelAr:s.label}}</button>
+        <button class="chip" v-for="s in chips" :key="s.q" @click="query=s.q;mode=s.mode||'search';search()">{{ar?s.labelAr:s.label}}</button>
       </div>
     </div>
 
@@ -347,7 +347,7 @@
     <div class="results" v-if="!loading && !error">
 
       <!-- Q&A -->
-      <template v-if="mode==='qa' && qaAnswer">
+      <template v-if="(mode==='qa'||mode==='reflect') && qaAnswer">
         <div class="qa" v-if="qaAnswer.answer">
           <div class="qa-label">{{tr.answer}} · {{tr.groundedIn}} {{qaAnswer.citations?.length||0}} {{tr.sources}}<span v-if="qaAnswer.online" style="margin-inline-start:8px;color:var(--gold)">· {{ar?'تفسير':'+'}} {{qaAnswer.online.label}} ({{qaAnswer.online.via}})</span></div>
           <div class="qa-body" v-html="mdLite(qaAnswer.answer)"></div>
@@ -522,6 +522,7 @@ createApp({
       {id:'search',label:'Search',labelAr:'بحث',placeholder:"Search the Qur'an…",placeholderAr:'ابحث في القرآن…',hasSearch:true},
       {id:'hadith',label:'Hadith',labelAr:'حديث',placeholder:'Search hadith collections…',placeholderAr:'ابحث في كتب الحديث…',hasSearch:true},
       {id:'qa',label:'Q&A',labelAr:'سؤال وجواب',placeholder:'Ask a question…',placeholderAr:'اطرح سؤالًا…',hasSearch:true},
+      {id:'reflect',label:'Reflect',labelAr:'تأمل',placeholder:'How are you feeling? e.g. anxious, grateful, lost',placeholderAr:'بماذا تشعر؟ قلق، امتنان، حيرة…',hasSearch:true},
       {id:'count',label:'Count',labelAr:'إحصاء',placeholder:'Count a word…',placeholderAr:'أحصِ كلمة…',hasSearch:true},
       {id:'browse',label:'Browse',labelAr:'تصفّح',hasSearch:false},
       {id:'themes',label:'Themes',labelAr:'المواضيع',hasSearch:false},
@@ -538,6 +539,17 @@ createApp({
       {label:'Justice',labelAr:'العدل',q:'justice'},{label:'Knowledge',labelAr:'العلم',q:'knowledge'},
       {label:'Ramadan',labelAr:'رمضان',q:'Ramadan fasting'},{label:'Angels',labelAr:'الملائكة',q:'angels'},
     ]
+
+    const moodChips=[
+      {label:'Anxious',labelAr:'قلق',q:'anxious and worried',mode:'reflect'},
+      {label:'Grateful',labelAr:'امتنان',q:'grateful and thankful',mode:'reflect'},
+      {label:'Grieving',labelAr:'حزن',q:'grieving a loss',mode:'reflect'},
+      {label:'Lost',labelAr:'حيرة',q:'lost and without direction',mode:'reflect'},
+      {label:'Hopeful',labelAr:'أمل',q:'hopeful',mode:'reflect'},
+      {label:'Fearful',labelAr:'خوف',q:'afraid',mode:'reflect'},
+      {label:'Seeking patience',labelAr:'صبر',q:'in need of patience',mode:'reflect'},
+    ]
+    const chips=computed(()=>mode.value==='reflect'?moodChips:suggestions)
 
     const distColors=['#a07d2c','#0d6a4c','#5c6fa0','#b8923a','#3f9e7c','#9a6fb0','#b06a5a','#5c9aa0']
 
@@ -652,6 +664,11 @@ createApp({
             if(data.indexing){error.value=`Building search index… (${data.progress||'please wait'})`;break}
             qaAnswer.value=data
             break
+          case 'reflect':
+            data=await post(`${API}/qa`,{question:`Someone shares that they are feeling: "${q}". Offer them brief comfort and guidance from the Qur'an and hadith, grounded in the passages and citing them.`,limit:4})
+            if(data.indexing){error.value=`Building search index… (${data.progress||'please wait'})`;break}
+            qaAnswer.value=data
+            break
           case 'count':
             data=await post(`${API}/count`,{word:q})
             countResult.value=data
@@ -748,7 +765,7 @@ createApp({
 
     return{
       query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
-      stats,toast,searched,suggestions,searchInput,surahFilter,onlineSearch,playingVerse,playAudio,showBookmarks,bookmarks,
+      stats,toast,searched,suggestions,chips,searchInput,surahFilter,onlineSearch,playingVerse,playAudio,showBookmarks,bookmarks,
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
       dark,toggleTheme,lang,ar,tr,toggleLang,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
       switchMode,search,showRelated,loadSurah,copy,shareVerse,toggleMic,recording,
