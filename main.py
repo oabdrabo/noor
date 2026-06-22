@@ -813,6 +813,24 @@ def chapters(request: Request):
         return {"chapters": []}
 
 
+@app.get("/api/daily")
+def daily(request: Request):
+    """Verse of the day: one verse picked deterministically by date from the indexed Quran."""
+    _rate_limit(request, 30)
+    s = request.app.state
+    if not s.quran_ready:
+        return {"verse": None}
+    n = s.db.execute("SELECT COUNT(*) FROM quran_metadata").fetchone()[0]
+    if not n:
+        return {"verse": None}
+    offset = int(time.time() // 86400) % n
+    row = s.db.execute(
+        f"SELECT {','.join(QURAN_COLS)} FROM quran_metadata ORDER BY verse_id LIMIT 1 OFFSET ?",
+        [offset],
+    ).fetchone()
+    return {"verse": dict(zip(QURAN_COLS, row)) if row else None}
+
+
 @app.get("/api/analytics/surah")
 def surah_analytics(request: Request):
     df = request.app.state.df_verses
