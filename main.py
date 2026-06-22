@@ -423,6 +423,16 @@ async def lifespan(app: FastAPI):
     df = pd.read_csv(CSV_PATH)
     df[COL_AR] = df[COL_AR].fillna("")
     df[COL_EN] = df[COL_EN].fillna("")
+    # The bundled CSV uses a non-standard Uthmani encoding (U+06E1 sukun, U+065E tanwin, no kashida
+    # under the dagger alef) that renders the tashkeel wrong. Swap in canonical text so every
+    # df_verses-backed surface (browse, related, analytics) shows correct marks; the DB index gets
+    # the same fix via _canonicalize_quran_text.
+    _uth = _load_uthmani()
+    if _uth:
+        df[COL_AR] = [
+            _uth.get(f"{int(sv)}:{int(av)}", tv)
+            for sv, av, tv in zip(df[COL_SURAH], df[COL_AYAH], df[COL_AR])
+        ]
     logger.info("%d verses loaded", len(df))
 
     @lru_cache(maxsize=2048)
