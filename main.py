@@ -591,7 +591,9 @@ def _fetch_tafsir(verse_key):
     """Fetch classical tafsir for a verse from Quran.com, HTML-stripped and truncated. Best-effort."""
     try:
         url = f"https://api.quran.com/api/v4/tafsirs/{TAFSIR_ID}/by_ayah/{verse_key}"
-        with urllib.request.urlopen(url, timeout=10) as resp:
+        # Quran.com's CDN 403s the default Python-urllib User-Agent; send an explicit one.
+        req = urllib.request.Request(url, headers={"User-Agent": "noor/1.0 (+https://noor.pyxis3.ai)"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
             raw = json.loads(resp.read()).get("tafsir", {}).get("text", "") or ""
         return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw)).strip()[:1400]
     except Exception as e:
