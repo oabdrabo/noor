@@ -831,6 +831,39 @@ def daily(request: Request):
     return {"verse": dict(zip(QURAN_COLS, row)) if row else None}
 
 
+JUZ_STARTS = [(1, 1), (2, 142), (2, 253), (3, 93), (4, 24), (4, 148), (5, 82), (6, 111), (7, 88),
+              (8, 41), (9, 93), (11, 6), (12, 53), (15, 1), (17, 1), (18, 75), (21, 1), (23, 1),
+              (25, 21), (27, 56), (29, 46), (33, 31), (36, 28), (39, 32), (41, 47), (46, 1),
+              (51, 31), (58, 1), (67, 1), (78, 1)]
+
+
+@app.get("/api/juz/{n}")
+def juz(n: int, request: Request):
+    """All verses of juz n (1-30), sliced from the indexed Quran by the standard juz boundaries."""
+    _rate_limit(request, 30)
+    if n < 1 or n > 30:
+        raise HTTPException(status_code=400, detail="Juz must be 1-30")
+    s = request.app.state
+    if not s.quran_ready:
+        return {"verses": [], "indexing": True}
+    db = s.db
+
+    def _vid(surah, ayah):
+        r = db.execute("SELECT verse_id FROM quran_metadata WHERE surah=? AND ayah=?", [surah, ayah]).fetchone()
+        return r[0] if r else None
+
+    start = _vid(*JUZ_STARTS[n - 1])
+    if start is None:
+        return {"juz": n, "verses": []}
+    end = _vid(*JUZ_STARTS[n]) if n < 30 else None
+    cols = ",".join(QURAN_COLS)
+    if end is None:
+        rows = db.execute(f"SELECT {cols} FROM quran_metadata WHERE verse_id>=? ORDER BY verse_id", [start]).fetchall()
+    else:
+        rows = db.execute(f"SELECT {cols} FROM quran_metadata WHERE verse_id>=? AND verse_id<? ORDER BY verse_id", [start, end]).fetchall()
+    return {"juz": n, "verses": [dict(zip(QURAN_COLS, r)) for r in rows]}
+
+
 @app.get("/api/analytics/surah")
 def surah_analytics(request: Request):
     df = request.app.state.df_verses

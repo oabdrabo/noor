@@ -427,21 +427,30 @@
 
       <!-- Browse -->
       <template v-else-if="mode==='browse'">
-        <div v-if="!browseSurah">
-          <div class="surahs">
+        <div v-if="!browseSurah && !browseJuz">
+          <div class="tabs" style="margin-bottom:14px">
+            <button class="tab" :class="{active:browseTab==='surah'}" @click="browseTab='surah'">{{tr.surahs}}</button>
+            <button class="tab" :class="{active:browseTab==='juz'}" @click="browseTab='juz'">{{tr.juz}}</button>
+          </div>
+          <div class="surahs" v-if="browseTab==='surah'">
             <div class="surah" v-for="n in 114" :key="n" @click="loadSurah(n)">
               <div class="n">{{n}}</div><div class="l">{{surahName(n)||tr.surah}}</div>
+            </div>
+          </div>
+          <div class="surahs" v-else>
+            <div class="surah" v-for="n in 30" :key="'j'+n" @click="loadJuz(n)">
+              <div class="n">{{n}}</div><div class="l">{{tr.juz}}</div>
             </div>
           </div>
         </div>
         <div v-else>
           <div class="browse-bar">
-            <button class="act" @click="browseSurah=null"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> {{tr.allSurahsBtn}}</button>
+            <button class="act" @click="browseSurah=null;browseJuz=null"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> {{tr.back}}</button>
             <button class="act" :class="{on:surahPlaying}" @click="playSurah"><svg viewBox="0 0 24 24"><path v-if="surahPlaying" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg> {{surahPlaying?tr.stopSurah:tr.playSurah}}</button>
-            <span style="font-size:12px;color:var(--ink-3)">{{tr.surah}} {{browseSurah}} · {{browseSurahData?.total_verses}} {{tr.verses}}</span>
+            <span style="font-size:12px;color:var(--ink-3)">{{browseJuz?tr.juz+' '+browseJuz:tr.surah+' '+browseSurah}} · {{browseSurahData?.verses?.length||browseSurahData?.total_verses||0}} {{tr.verses}}</span>
           </div>
           <div class="results">
-            <verse-card v-for="bv in browseSurahData?.verses||[]" :key="bv.ayah" :v="{surah:browseSurah,ayah:bv.ayah,text:bv.text,translation:bv.translation}"></verse-card>
+            <verse-card v-for="bv in browseSurahData?.verses||[]" :key="(bv.surah||browseSurah)+':'+bv.ayah" :v="{surah:bv.surah||browseSurah,ayah:bv.ayah,text:bv.text,translation:bv.translation}"></verse-card>
           </div>
         </div>
       </template>
@@ -543,13 +552,14 @@ createApp({
     const distribution=ref(null)
     const wordcloudImg=ref(null)
     const browseSurah=ref(null)
+    const browseTab=ref('surah'),browseJuz=ref(null)
     const browseSurahData=ref(null)
     const dark=ref(document.documentElement.dataset.theme==='dark')
     const lang=ref(localStorage.getItem('noor-lang')||'en')
     const ar=computed(()=>lang.value==='ar')
     const STR={
-      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',dailyVerse:'Verse of the day',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',translations:'Translations',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',similar:'Similar',share:'Share',allSurahsBtn:'All surahs',playSurah:'Play surah',stopSurah:'Stop',switchLang:'العربية'},
-      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',translations:'ترجمات',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',similar:'مشابه',share:'مشاركة',allSurahsBtn:'كل السور',playSurah:'تشغيل السورة',stopSurah:'إيقاف',switchLang:'English'},
+      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',dailyVerse:'Verse of the day',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',translations:'Translations',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',similar:'Similar',share:'Share',allSurahsBtn:'All surahs',playSurah:'Play surah',stopSurah:'Stop',juz:'Juz',back:'Back',switchLang:'العربية'},
+      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',translations:'ترجمات',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',similar:'مشابه',share:'مشاركة',allSurahsBtn:'كل السور',playSurah:'تشغيل السورة',stopSurah:'إيقاف',juz:'جزء',back:'رجوع',switchLang:'English'},
     }
     const tr=computed(()=>STR[lang.value])
 
@@ -638,19 +648,19 @@ createApp({
     }
     function playSurah(){
       if(surahPlaying.value){surahPlaying.value=false;_audio&&_audio.pause();playingVerse.value=null;return}
-      const ays=(browseSurahData.value?.verses||[]).map(v=>v.ayah)
-      if(!ays.length)return
+      const vs=browseSurahData.value?.verses||[]
+      if(!vs.length)return
       if(!_audio){_audio=new Audio()}
       _audio.onerror=()=>{surahPlaying.value=false;playingVerse.value=null}
       surahPlaying.value=true
-      const pad=n=>String(n).padStart(3,'0'),su=browseSurah.value
+      const pad=n=>String(n).padStart(3,'0')
       let i=0
       const nxt=()=>{
-        if(!surahPlaying.value||i>=ays.length){surahPlaying.value=false;playingVerse.value=null;return}
-        const a=ays[i++]
-        _audio.src=`https://everyayah.com/data/Alafasy_128kbps/${pad(su)}${pad(a)}.mp3`
+        if(!surahPlaying.value||i>=vs.length){surahPlaying.value=false;playingVerse.value=null;return}
+        const v=vs[i++],su=v.surah||browseSurah.value
+        _audio.src=`https://everyayah.com/data/Alafasy_128kbps/${pad(su)}${pad(v.ayah)}.mp3`
         _audio.onended=nxt
-        _audio.play().then(()=>{playingVerse.value=su+':'+a}).catch(()=>{surahPlaying.value=false;playingVerse.value=null})
+        _audio.play().then(()=>{playingVerse.value=su+':'+v.ayah}).catch(()=>{surahPlaying.value=false;playingVerse.value=null})
       }
       nxt()
     }
@@ -713,7 +723,7 @@ createApp({
       searched.value=false;results.value=[];qaAnswer.value=null;countResult.value=null;themes.value=null;error.value=''
       if(m.id==='themes')loadThemes()
       else if(m.id==='analytics')loadAnalytics()
-      else if(m.id==='browse'){browseSurah.value=null;browseSurahData.value=null}
+      else if(m.id==='browse'){browseSurah.value=null;browseJuz.value=null;browseSurahData.value=null}
       else nextTick(()=>searchInput.value?.focus())
     }
 
@@ -810,6 +820,12 @@ createApp({
       catch(e){error.value=e.message}
       finally{loading.value=false}
     }
+    async function loadJuz(n){
+      browseJuz.value=n;loading.value=true;error.value=''
+      try{browseSurahData.value=await get(`${API}/juz/${n}`)}
+      catch(e){error.value=e.message}
+      finally{loading.value=false}
+    }
 
     async function post(url,body){
       const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -898,7 +914,7 @@ createApp({
       stats,toast,searched,suggestions,chips,searchInput,surahFilter,surahName,dailyVerse,onlineSearch,playingVerse,playAudio,showBookmarks,bookmarks,
       analyticsData,distribution,wordcloudImg,browseSurah,browseSurahData,isIndexingError,
       dark,toggleTheme,lang,ar,tr,toggleLang,isArabic,pct,fmt,scoreClass,mdLite,distPct,distColor,
-      switchMode,search,showRelated,loadSurah,copy,shareVerse,toggleMic,recording,verseWords,showWords,surahPlaying,playSurah,
+      switchMode,search,showRelated,loadSurah,loadJuz,browseTab,browseJuz,copy,shareVerse,toggleMic,recording,verseWords,showWords,surahPlaying,playSurah,
       isBookmarked,toggleBookmark,removeBookmark,saveBookmarks,showToast
     }
   }
