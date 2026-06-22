@@ -9,4 +9,4 @@ venv/
 *.csv
 *.db
 /data/*
-!/data/quran-uthmani.json
+!/data/*.json

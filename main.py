@@ -255,15 +255,8 @@ def _index_quran(state, stop):
     en = df[COL_EN].astype(str).to_numpy()
     surah = df[COL_SURAH].to_numpy()
     ayah = df[COL_AYAH].to_numpy()
-    # Prefer canonical Uthmani over the dataset's non-standard encoding for both the stored text and
-    # the embedding, so a fresh index is correct end-to-end. Existing indexes instead get the display
-    # fix from _canonicalize_quran_text (no costly re-embed).
-    uth = _load_uthmani()
-    if uth:
-        ar = np.array([uth.get(f"{int(surah[j])}:{int(ayah[j])}", ar[j]) for j in range(total)], dtype=object)
-    # Embed each verse's Arabic together with its English translation so BOTH Arabic and English
-    # queries match natively. The small multilingual model's cross-lingual matching is weak, so
-    # en-only passages made Arabic queries (the Quran's primary language) underperform badly.
+    uth = _data_file("quran-uthmani.json")
+    ar = np.array([uth.get(f"{int(surah[j])}:{int(ayah[j])}", ar[j]) for j in range(total)], dtype=object)
     texts = [f"passage: {a} {e}" for a, e in zip(ar, en)]
 
     def persist(i, embeddings):
@@ -357,35 +350,22 @@ def _index_hadith(state, stop):
         logger.info("Hadith index complete (%d)", total)
 
 
-@lru_cache(maxsize=1)
-def _load_uthmani():
-    """Canonical Uthmani verse text (verse_key -> text) from data/quran-uthmani.json."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "quran-uthmani.json")
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.warning("Uthmani map unavailable (%s) - verse text left as-is", e)
-        return {}
+@lru_cache(maxsize=None)
+def _data_file(name):
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", name), encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _canonicalize_quran_text(db):
-    """Rewrite the display Arabic to canonical Uthmani. The bundled dataset encodes the sukun as
-    U+06E1 and omits the kashida under the dagger alef, so the tashkeel renders in the wrong shape;
-    the canonical text fixes the mark shapes. Display-only, idempotent, no re-embedding (diacritics
-    barely move the multilingual-e5 vectors, so the existing index stays valid)."""
     sample = db.execute("SELECT text FROM quran_metadata WHERE surah=1 AND ayah=1").fetchone()
     if not sample or "ۡ" not in (sample[0] or ""):
-        return  # already canonical (or not yet indexed) -> nothing to do
-    uth = _load_uthmani()
-    if not uth:
         return
+    uth = _data_file("quran-uthmani.json")
     rows = db.execute("SELECT verse_id, surah, ayah FROM quran_metadata").fetchall()
     updates = [(uth[k], vid) for vid, s, a in rows if (k := f"{s}:{a}") in uth]
-    if updates:
-        db.executemany("UPDATE quran_metadata SET text=? WHERE verse_id=?", updates)
-        db.commit()
-        logger.info("Canonicalized %d Quran verses to Uthmani display text", len(updates))
+    db.executemany("UPDATE quran_metadata SET text=? WHERE verse_id=?", updates)
+    db.commit()
+    logger.info("Canonicalized %d Quran verses to Uthmani", len(updates))
 
 
 def _index_all(state, stop):
@@ -423,16 +403,11 @@ async def lifespan(app: FastAPI):
     df = pd.read_csv(CSV_PATH)
     df[COL_AR] = df[COL_AR].fillna("")
     df[COL_EN] = df[COL_EN].fillna("")
-    # The bundled CSV uses a non-standard Uthmani encoding (U+06E1 sukun, U+065E tanwin, no kashida
-    # under the dagger alef) that renders the tashkeel wrong. Swap in canonical text so every
-    # df_verses-backed surface (browse, related, analytics) shows correct marks; the DB index gets
-    # the same fix via _canonicalize_quran_text.
-    _uth = _load_uthmani()
-    if _uth:
-        df[COL_AR] = [
-            _uth.get(f"{int(sv)}:{int(av)}", tv)
-            for sv, av, tv in zip(df[COL_SURAH], df[COL_AYAH], df[COL_AR])
-        ]
+    uth = _data_file("quran-uthmani.json")
+    df[COL_AR] = [
+        uth.get(f"{int(sv)}:{int(av)}", tv)
+        for sv, av, tv in zip(df[COL_SURAH], df[COL_AYAH], df[COL_AR])
+    ]
     logger.info("%d verses loaded", len(df))
 
     @lru_cache(maxsize=2048)
@@ -632,21 +607,27 @@ def search_hadith(query: SearchQuery, request: Request):
     return {"results": results, "total": len(results)}
 
 
-TAFSIR_ID = 169  # Tafsir Ibn Kathir (Abridged), via the Quran.com public API
+TAFSIR_ID = 169
+_QURAN_UA = "noor/1.0 (+https://noor.pyxis3.ai)"
+
+
+def _quran_api(path):
+    req = urllib.request.Request(f"https://api.quran.com/api/v4/{path}", headers={"User-Agent": _QURAN_UA})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        logger.error("quran.com %s: %s", path, e)
+        return None
+
+
+def _strip_html(text):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text or "")).strip()
 
 
 def _fetch_tafsir(verse_key):
-    """Fetch classical tafsir for a verse from Quran.com, HTML-stripped and truncated. Best-effort."""
-    try:
-        url = f"https://api.quran.com/api/v4/tafsirs/{TAFSIR_ID}/by_ayah/{verse_key}"
-        # Quran.com's CDN 403s the default Python-urllib User-Agent; send an explicit one.
-        req = urllib.request.Request(url, headers={"User-Agent": "noor/1.0 (+https://noor.pyxis3.ai)"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            raw = json.loads(resp.read()).get("tafsir", {}).get("text", "") or ""
-        return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw)).strip()[:1400]
-    except Exception as e:
-        logger.error("tafsir fetch failed for %s: %s", verse_key, e)
-        return ""
+    data = _quran_api(f"tafsirs/{TAFSIR_ID}/by_ayah/{verse_key}")
+    return _strip_html((data.get("tafsir") or {}).get("text", ""))[:1400] if data else ""
 
 
 @app.post("/api/qa")
@@ -785,30 +766,19 @@ def related(surah: int, ayah: int, request: Request, limit: int = 6):
 
 @app.get("/api/words/{surah}/{ayah}")
 def words(surah: int, ayah: int, request: Request):
-    """Word-by-word breakdown for a verse (Arabic + gloss), proxied from Quran.com. Best-effort."""
     _rate_limit(request, 40)
-    try:
-        url = (
-            f"https://api.quran.com/api/v4/verses/by_key/{surah}:{ayah}"
-            "?words=true&word_fields=text_uthmani,char_type_name"
-        )
-        req = urllib.request.Request(url, headers={"User-Agent": "noor/1.0 (+https://noor.pyxis3.ai)"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
-        out = [
-            {"ar": w.get("text_uthmani", ""), "en": (w.get("translation") or {}).get("text", "")}
-            for w in data.get("verse", {}).get("words", [])
-            if w.get("char_type_name") == "word"
-        ]
-        return {"words": out}
-    except Exception as e:
-        logger.error("words fetch failed for %s:%s: %s", surah, ayah, e)
+    data = _quran_api(f"verses/by_key/{surah}:{ayah}?words=true&word_fields=text_uthmani,char_type_name")
+    if not data:
         return {"words": []}
+    return {"words": [
+        {"ar": w.get("text_uthmani", ""), "en": (w.get("translation") or {}).get("text", "")}
+        for w in data.get("verse", {}).get("words", [])
+        if w.get("char_type_name") == "word"
+    ]}
 
 
 @app.get("/api/tafsir/{surah}/{ayah}")
 def tafsir(surah: int, ayah: int, request: Request):
-    """Classical tafsir (Ibn Kathir) for a verse, for inline display in the card. Best-effort."""
     _rate_limit(request, 40)
     return {"tafsir": _fetch_tafsir(f"{surah}:{ayah}")}
 
@@ -818,47 +788,21 @@ TRANSLATIONS = {20: "Saheeh International", 19: "Pickthall", 22: "Yusuf Ali", 85
 
 @app.get("/api/translations/{surah}/{ayah}")
 def translations(surah: int, ayah: int, request: Request):
-    """Multiple English translations for a verse, from Quran.com. Best-effort."""
     _rate_limit(request, 40)
-    try:
-        ids = ",".join(str(i) for i in TRANSLATIONS)
-        url = f"https://api.quran.com/api/v4/verses/by_key/{surah}:{ayah}?translations={ids}"
-        req = urllib.request.Request(url, headers={"User-Agent": "noor/1.0 (+https://noor.pyxis3.ai)"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
-        out = []
-        for t in data.get("verse", {}).get("translations", []):
-            text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", t.get("text", "") or "")).strip()
-            out.append({"name": TRANSLATIONS.get(t.get("resource_id"), "Translation"), "text": text})
-        return {"translations": out}
-    except Exception as e:
-        logger.error("translations fetch failed for %s:%s: %s", surah, ayah, e)
+    ids = ",".join(map(str, TRANSLATIONS))
+    data = _quran_api(f"verses/by_key/{surah}:{ayah}?translations={ids}")
+    if not data:
         return {"translations": []}
-
-
-@lru_cache(maxsize=1)
-def _chapters():
-    req = urllib.request.Request(
-        "https://api.quran.com/api/v4/chapters",
-        headers={"User-Agent": "noor/1.0 (+https://noor.pyxis3.ai)"},
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read())
-    return [
-        {"id": c["id"], "en": c.get("name_simple", ""), "ar": c.get("name_arabic", "")}
-        for c in data.get("chapters", [])
-    ]
+    return {"translations": [
+        {"name": TRANSLATIONS.get(t.get("resource_id"), "Translation"), "text": _strip_html(t.get("text"))}
+        for t in data.get("verse", {}).get("translations", [])
+    ]}
 
 
 @app.get("/api/chapters")
 def chapters(request: Request):
-    """Surah names (English + Arabic) from Quran.com, for the browse list + card refs."""
     _rate_limit(request, 40)
-    try:
-        return {"chapters": _chapters()}
-    except Exception as e:
-        logger.error("chapters fetch failed: %s", e)
-        return {"chapters": []}
+    return {"chapters": _data_file("chapters.json")}
 
 
 @app.get("/api/daily")
