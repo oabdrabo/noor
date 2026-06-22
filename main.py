@@ -147,7 +147,7 @@ class QAQuery(BaseModel):
 
 
 class TranscribeQuery(BaseModel):
-    audio: str = Field(..., max_length=2_700_000)  # ~2 MB base64; matches nginx body cap
+    audio: str = Field(..., max_length=2_700_000)
     content_type: str = Field("audio/webm", max_length=80, pattern=r"^[\w.+-]+/[\w.+-]+$")
 
 
