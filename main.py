@@ -765,6 +765,29 @@ def tafsir(surah: int, ayah: int, request: Request):
     return {"tafsir": _fetch_tafsir(f"{surah}:{ayah}")}
 
 
+TRANSLATIONS = {20: "Saheeh International", 19: "Pickthall", 22: "Yusuf Ali", 85: "Abdel Haleem"}
+
+
+@app.get("/api/translations/{surah}/{ayah}")
+def translations(surah: int, ayah: int, request: Request):
+    """Multiple English translations for a verse, from Quran.com. Best-effort."""
+    _rate_limit(request, 40)
+    try:
+        ids = ",".join(str(i) for i in TRANSLATIONS)
+        url = f"https://api.quran.com/api/v4/verses/by_key/{surah}:{ayah}?translations={ids}"
+        req = urllib.request.Request(url, headers={"User-Agent": "noor/1.0 (+https://noor.pyxis3.ai)"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        out = []
+        for t in data.get("verse", {}).get("translations", []):
+            text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", t.get("text", "") or "")).strip()
+            out.append({"name": TRANSLATIONS.get(t.get("resource_id"), "Translation"), "text": text})
+        return {"translations": out}
+    except Exception as e:
+        logger.error("translations fetch failed for %s:%s: %s", surah, ayah, e)
+        return {"translations": []}
+
+
 @lru_cache(maxsize=1)
 def _chapters():
     req = urllib.request.Request(

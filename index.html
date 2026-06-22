@@ -264,6 +264,9 @@
     .rel-v:first-of-type{border-top:none}
     .rel-v:hover{color:var(--gold)}
     .rel-v strong{color:var(--gold);margin-inline-end:8px}
+    .trans-row{padding:8px 0;border-top:1px solid var(--gold-line);font-size:13.5px;line-height:1.7;color:var(--ink)}
+    .trans-row:first-of-type{border-top:none}
+    .trans-name{display:block;font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
     .act.ico{padding:8px;min-width:0}
     .act.ico.on{background:var(--gold-tint);border-color:var(--gold-line);color:var(--gold)}
     .ref-name{color:var(--gold);font-weight:600;margin-inline-end:7px}
@@ -480,6 +483,13 @@ const VerseCard={
       <div v-if="verseTafsir[v.surah+':'+v.ayah]" class="inline-body">{{verseTafsir[v.surah+':'+v.ayah]}}</div>
       <div v-else class="inline-loading"><span class="spinner"></span></div>
     </div>
+    <div class="inline-sec" v-if="v.surah && verseTrans[v.surah+':'+v.ayah]!==undefined">
+      <div class="inline-label">{{tr.translations}}</div>
+      <div v-if="verseTrans[v.surah+':'+v.ayah]">
+        <div class="trans-row" v-for="(t,ti) in verseTrans[v.surah+':'+v.ayah]" :key="ti"><span class="trans-name">{{t.name}}</span>{{t.text}}</div>
+      </div>
+      <div v-else class="inline-loading"><span class="spinner"></span></div>
+    </div>
     <div class="inline-sec" v-if="v.surah && verseRelated[v.surah+':'+v.ayah]?.length">
       <div class="inline-label">{{tr.relatedH}}</div>
       <div class="rel-v" v-for="(rv,ri) in verseRelated[v.surah+':'+v.ayah]" :key="ri" @click="goVerse(rv)">
@@ -491,6 +501,7 @@ const VerseCard={
       <button class="act ico" :class="{on:verseWords[v.surah+':'+v.ayah]}" @click="showWords(v.surah,v.ayah)" :title="tr.words"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></button>
       <button class="act ico" :class="{on:verseRelated[v.surah+':'+v.ayah]}" @click="toggleRelated(v.surah,v.ayah)" :title="tr.relatedH"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
       <button class="act ico" :class="{on:verseTafsir[v.surah+':'+v.ayah]!==undefined}" @click="toggleTafsir(v.surah,v.ayah)" :title="tr.tafsir"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></button>
+      <button class="act ico" :class="{on:verseTrans[v.surah+':'+v.ayah]!==undefined}" @click="toggleTrans(v.surah,v.ayah)" :title="tr.translations"><svg viewBox="0 0 24 24"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg></button>
       <button class="act ico" @click="copy(v)" :title="tr.copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>
       <button class="act ico" :class="{on:isBookmarked(v)}" @click="toggleBookmark(v)" :title="isBookmarked(v)?tr.saved:tr.save"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></button>
       <button class="act ico" @click="shareVerse(v)" :title="tr.share"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg></button>
@@ -531,8 +542,8 @@ createApp({
     const lang=ref(localStorage.getItem('noor-lang')||'en')
     const ar=computed(()=>lang.value==='ar')
     const STR={
-      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',similar:'Similar',share:'Share',allSurahsBtn:'All surahs',switchLang:'العربية'},
-      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',similar:'مشابه',share:'مشاركة',allSurahsBtn:'كل السور',switchLang:'English'},
+      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',translations:'Translations',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',similar:'Similar',share:'Share',allSurahsBtn:'All surahs',switchLang:'العربية'},
+      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',translations:'ترجمات',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',similar:'مشابه',share:'مشاركة',allSurahsBtn:'كل السور',switchLang:'English'},
     }
     const tr=computed(()=>STR[lang.value])
 
@@ -639,7 +650,7 @@ createApp({
       }catch(e){showToast('Word-by-word unavailable')}
     }
 
-    const verseRelated=ref({}), verseTafsir=ref({})
+    const verseRelated=ref({}), verseTafsir=ref({}), verseTrans=ref({})
     async function toggleRelated(surah,ayah){
       const key=surah+':'+ayah
       if(verseRelated.value[key]){const c={...verseRelated.value};delete c[key];verseRelated.value=c;return}
@@ -659,6 +670,16 @@ createApp({
       }catch(e){const c={...verseTafsir.value};delete c[key];verseTafsir.value=c;showToast('Tafsir unavailable')}
     }
     function goVerse(rv){query.value=rv.surah+':'+rv.ayah;mode.value='search';search()}
+    async function toggleTrans(surah,ayah){
+      const key=surah+':'+ayah
+      if(verseTrans.value[key]!==undefined){const c={...verseTrans.value};delete c[key];verseTrans.value=c;return}
+      verseTrans.value={...verseTrans.value,[key]:null}
+      try{
+        const d=await fetch(`${API}/translations/${surah}/${ayah}`).then(r=>r.json())
+        if(!d.translations?.length){const c={...verseTrans.value};delete c[key];verseTrans.value=c;showToast('Translations unavailable');return}
+        verseTrans.value={...verseTrans.value,[key]:d.translations}
+      }catch(e){const c={...verseTrans.value};delete c[key];verseTrans.value=c;showToast('Translations unavailable')}
+    }
 
     function switchMode(m){
       mode.value=m.id
@@ -815,7 +836,7 @@ createApp({
     })
     onUnmounted(()=>document.removeEventListener('keydown',onKeydown))
 
-    provide('ctx',{tr,ar,isArabic,pct,scoreClass,surahName,playingVerse,playAudio,verseWords,showWords,verseRelated,toggleRelated,verseTafsir,toggleTafsir,goVerse,copy,shareVerse,isBookmarked,toggleBookmark})
+    provide('ctx',{tr,ar,isArabic,pct,scoreClass,surahName,playingVerse,playAudio,verseWords,showWords,verseRelated,toggleRelated,verseTafsir,toggleTafsir,verseTrans,toggleTrans,goVerse,copy,shareVerse,isBookmarked,toggleBookmark})
 
     return{
       query,mode,modes,currentMode,loading,error,results,qaAnswer,countResult,themes,
