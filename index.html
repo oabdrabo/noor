@@ -33,8 +33,8 @@
     </header>
 
     <div class="flex items-center justify-center gap-4 text-xs text-ink-3 mt-3" v-if="stats">
-      <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" :class="stats.status==='Ready'?'bg-emerald':'bg-gold'"></span> <strong class="text-ink-2 font-semibold">{{fmt(stats.indexed_verses)}}</strong> {{tr.verses}}</span>
-      <span class="flex items-center gap-1.5"><strong class="text-ink-2 font-semibold">{{fmt(stats.total_hadiths)}}</strong> {{tr.hadith}}</span>
+      <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" :class="stats.quran_ready?'bg-emerald':'bg-gold animate-pulse'"></span> <strong class="text-ink-2 font-semibold">{{fmt(stats.indexed_verses)}}</strong> {{tr.verses}}</span>
+      <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" :class="stats.hadith_ready?'bg-emerald':'bg-gold animate-pulse'"></span> <strong class="text-ink-2 font-semibold">{{fmt(stats.total_hadiths)}}</strong> {{tr.hadith}}</span>
       <span class="px-2.5 py-0.5 rounded-full border border-line font-medium" :class="stats.status==='Ready'?'text-emerald':'text-gold'">{{stats.status}}</span>
     </div>
 

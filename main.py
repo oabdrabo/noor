@@ -505,6 +505,8 @@ def stats(request: Request):
     return {
         "total_verses": len(s.df_verses),
         "status": "Ready" if s.quran_ready else "Loading",
+        "quran_ready": s.quran_ready,
+        "hadith_ready": s.hadith_ready,
         "indexed_verses": s.db.execute("SELECT COUNT(*) FROM quran_vec").fetchone()[0],
         "total_hadiths": s.db.execute("SELECT COUNT(*) FROM hadith_vec").fetchone()[0],
     }
