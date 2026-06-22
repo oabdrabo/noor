@@ -229,7 +229,7 @@ const VerseCard={
       <span class="text-sm font-semibold text-gold" v-else-if="v.collection"><span class="text-ink-2">{{v.collection}}</span> #{{v.hadith_number}}</span>
       <span class="text-2xs px-2 py-0.5 rounded-full font-semibold" :class="scoreClass(v.score)" v-if="v.score">{{pct(v.score)}}</span>
     </div>
-    <div class="font-ar text-3xl leading-loose text-end text-ink" dir="rtl" v-if="v.text && isArabic(v.text)">{{v.text}}</div>
+    <div class="font-ar text-3xl leading-loose text-right text-ink" dir="rtl" v-if="v.text && isArabic(v.text)">{{v.text}}</div>
     <div class="text-base leading-relaxed text-ink" v-else-if="v.text">{{v.text}}</div>
     <div class="text-sm leading-relaxed text-ink-2 mt-2" v-if="v.translation">{{v.translation}}</div>
     <div class="flex gap-1 mt-4 pt-3.5 border-t border-line flex-wrap" v-if="v.surah">
