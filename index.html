@@ -108,7 +108,7 @@
       </div>
       <div class="text-2xs tracking-widest uppercase text-ink-3 font-semibold mx-0.5 mb-3">{{tr.tryLabel}}</div>
       <div class="flex gap-2 flex-wrap">
-        <button class="px-4 py-2 bg-surface border border-line rounded-full text-sm text-ink-2 hover:border-gold/40 hover:text-gold hover:-translate-y-px transition" v-for="s in chips" :key="s.q" @click="query=s.q;mode=s.mode||'search';source=s.source||'quran';search()">{{ar?s.labelAr:s.label}}</button>
+        <button class="px-4 py-2 bg-surface text-ink-2 rounded-full text-sm shadow-sm hover:text-gold hover:shadow transition" v-for="s in chips" :key="s.q" @click="query=s.q;mode=s.mode||'search';source=s.source||'quran';search()">{{ar?s.labelAr:s.label}}</button>
       </div>
     </div>
 
