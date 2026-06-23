@@ -59,3 +59,21 @@ Q&A and voice are backed by two optional services, reached server-side so no mod
 ## Why
 
 Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that answers *intent* questions - *"verses about patience in adversity"*, *"hadith on neighbours' rights"* - and surfaces matches by meaning, not surface form. Multilingual embeddings make this practical; `sqlite-vec` makes it deployable on a Raspberry Pi.
+
+## Contributing
+
+Issues, ideas, and PRs are welcome - keep PRs focused on a single concern and follow the existing conventions.
+
+## Support & sponsors
+
+Noor is free, open-source, and has no tracking or ads. If it's useful to you, you can support continued development - pay what you like, once or monthly:
+
+<p align="center">
+  <a href="https://donate.stripe.com/3cI6oI7Gh1PG0eV8MJ5kk00"><img src="https://img.shields.io/badge/%20Donate%20once-pay%20what%20you%20like-635bff?logo=stripe&logoColor=white" alt="Donate once via Stripe" height="30" /></a>
+  &nbsp;
+  <a href="https://buy.stripe.com/00wbJ2f8J51S9Pv1kh5kk01"><img src="https://img.shields.io/badge/%20Sponsor%20monthly-recurring-56c4e6?logo=stripe&logoColor=white" alt="Sponsor monthly via Stripe" height="30" /></a>
+</p>
+
+## License
+
+[MIT](LICENSE) © 2026 Omar A.
