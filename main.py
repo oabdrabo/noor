@@ -44,7 +44,6 @@ STT_MODEL = os.environ.get("STT_MODEL", "Systran/faster-whisper-small")
 
 _RL: dict[str, tuple[int, float]] = {}
 
-
 def _rate_limit(request: Request, limit: int, window: float = 60.0) -> None:
     ip = (
         request.headers.get("x-real-ip")
@@ -62,7 +61,6 @@ def _rate_limit(request: Request, limit: int, window: float = 60.0) -> None:
     _RL[ip] = (count, reset)
     if count > limit:
         raise HTTPException(status_code=429, detail="Too many requests - slow down.")
-
 
 COL_SURAH = "surah_no"
 COL_AYAH = "ayah_no_surah"
@@ -105,10 +103,8 @@ QA_SYSTEM = (
     "ordinary punctuation (commas, periods, hyphens); never use em-dashes or en-dashes."
 )
 
-
 def serialize_f32(vector):
     return np.asarray(vector, dtype=np.float32).tobytes()
-
 
 def _vec_search(db, vec_table, meta_table, id_col, columns, query_emb, limit):
     hits = db.execute(
@@ -127,29 +123,24 @@ def _vec_search(db, vec_table, meta_table, id_col, columns, query_emb, limit):
     meta = {r[0]: r[1:] for r in rows}
     return [dict(zip(columns, meta[i]), score=score[i]) for i in ids if i in meta]
 
-
 class SearchQuery(BaseModel):
     query: str
     limit: int = Field(10, ge=1, le=50)
     surah_filter: Optional[int] = Field(None, ge=1, le=114)
     similarity_threshold: float = Field(0.3, ge=0.0, le=1.0)
 
-
 class CountQuery(BaseModel):
     word: str
     case_sensitive: bool = False
-
 
 class QAQuery(BaseModel):
     question: str
     limit: int = Field(5, ge=1, le=10)
     online: bool = False
 
-
 class TranscribeQuery(BaseModel):
     audio: str = Field(..., max_length=2_700_000)
     content_type: str = Field("audio/webm", max_length=80, pattern=r"^[\w.+-]+/[\w.+-]+$")
-
 
 def _connect():
     import sqlite_vec
@@ -168,13 +159,11 @@ def _connect():
         db.execute(pragma)
     return db
 
-
 def _create_hadith_metadata(db):
     db.execute(
         "CREATE TABLE IF NOT EXISTS hadith_metadata "
         "(hadith_id INTEGER PRIMARY KEY AUTOINCREMENT, collection TEXT, hadith_number TEXT, text TEXT, reference TEXT)"
     )
-
 
 def _init_schema(db):
     db.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
@@ -184,7 +173,6 @@ def _init_schema(db):
     )
     _create_hadith_metadata(db)
     db.commit()
-
 
 def _ensure_model(db):
     stored = db.execute("SELECT value FROM meta WHERE key='model'").fetchone()
@@ -208,7 +196,6 @@ def _ensure_model(db):
     )
     db.commit()
 
-
 def _run_batches(state, stop, texts, label, start, persist):
     total = len(texts)
     for i in range(start, total, BATCH):
@@ -222,7 +209,6 @@ def _run_batches(state, stop, texts, label, start, persist):
         if done % 256 == 0 or done == total:
             logger.info("Indexed %s %d/%d", label, done, total)
     return True
-
 
 def _index_quran(state, stop):
     db = state.db
@@ -273,7 +259,6 @@ def _index_quran(state, stop):
         state.quran_ready = True
         logger.info("Quran index complete (%d)", total)
 
-
 def _download_hadith(stop):
     records = []
     for url, name in HADITH_SOURCES:
@@ -294,7 +279,6 @@ def _download_hadith(stop):
                 }
             )
     return records
-
 
 def _index_hadith(state, stop):
     db = state.db
@@ -344,12 +328,10 @@ def _index_hadith(state, stop):
         state.hadith_ready = True
         logger.info("Hadith index complete (%d)", total)
 
-
 @lru_cache(maxsize=None)
 def _data_file(name):
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", name), encoding="utf-8") as f:
         return json.load(f)
-
 
 def _index_all(state, stop):
     try:
@@ -364,7 +346,6 @@ def _index_all(state, stop):
         if not stop.is_set():
             logger.exception("Indexing failed")
             state.index_progress = "Error"
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -423,7 +404,6 @@ async def lifespan(app: FastAPI):
     thread.join(timeout=5)
     db.close()
 
-
 app = FastAPI(title="Noor", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
@@ -432,10 +412,8 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-
 def _indexing(progress):
     return {"results": [], "total": 0, "indexing": True, "progress": progress}
-
 
 def _format_context(verses, hadith):
     lines = [f"[{v['surah']}:{v['ayah']}] {v['translation']}" for v in verses]
@@ -443,7 +421,6 @@ def _format_context(verses, hadith):
         f"[{h['collection']} {h['hadith_number']}] {h['text'][:600]}" for h in hadith
     ]
     return "\n".join(lines)
-
 
 def _aigw_chat(messages):
     body = json.dumps(
@@ -464,7 +441,6 @@ def _aigw_chat(messages):
     except (urllib.error.URLError, KeyError, IndexError, TimeoutError) as e:
         logger.error("aigw call failed: %s", e)
         raise HTTPException(status_code=502, detail="Q&A backend unavailable")
-
 
 def _stt(audio, filename, content_type):
     boundary = "----noortranscribe"
@@ -487,7 +463,6 @@ def _stt(audio, filename, content_type):
         logger.error("stt call failed: %s", e)
         raise HTTPException(status_code=502, detail="Transcription unavailable")
 
-
 @app.get("/api/health")
 async def health(request: Request):
     s = request.app.state
@@ -497,7 +472,6 @@ async def health(request: Request):
         "hadith_ready": s.hadith_ready,
         "progress": s.index_progress,
     }
-
 
 @app.get("/api/stats")
 def stats(request: Request):
@@ -510,7 +484,6 @@ def stats(request: Request):
         "indexed_verses": s.db.execute("SELECT COUNT(*) FROM quran_vec").fetchone()[0],
         "total_hadiths": s.db.execute("SELECT COUNT(*) FROM hadith_vec").fetchone()[0],
     }
-
 
 @app.post("/api/search")
 def search_verses(query: SearchQuery, request: Request):
@@ -562,7 +535,6 @@ def search_verses(query: SearchQuery, request: Request):
     results = results[: query.limit]
     return {"results": results, "total": len(results)}
 
-
 @app.post("/api/hadith/search")
 def search_hadith(query: SearchQuery, request: Request):
     _rate_limit(request, 60)
@@ -584,10 +556,8 @@ def search_hadith(query: SearchQuery, request: Request):
     results = [r for r in hits if r["score"] >= query.similarity_threshold]
     return {"results": results, "total": len(results)}
 
-
 TAFSIR_ID = 169
 _QURAN_UA = "noor/1.0 (+https://noor.pyxis3.ai)"
-
 
 def _quran_api(path):
     req = urllib.request.Request(f"https://api.quran.com/api/v4/{path}", headers={"User-Agent": _QURAN_UA})
@@ -598,15 +568,12 @@ def _quran_api(path):
         logger.error("quran.com %s: %s", path, e)
         return None
 
-
 def _strip_html(text):
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text or "")).strip()
-
 
 def _fetch_tafsir(verse_key):
     data = _quran_api(f"tafsirs/{TAFSIR_ID}/by_ayah/{verse_key}")
     return _strip_html((data.get("tafsir") or {}).get("text", ""))[:1400] if data else ""
-
 
 @app.post("/api/qa")
 def qa(query: QAQuery, request: Request):
@@ -667,7 +634,6 @@ def qa(query: QAQuery, request: Request):
     ]
     return {"answer": _aigw_chat(messages), "citations": verses + hadith, "online": online}
 
-
 @app.post("/api/transcribe")
 def transcribe(query: TranscribeQuery, request: Request):
     _rate_limit(request, 15)
@@ -676,7 +642,6 @@ def transcribe(query: TranscribeQuery, request: Request):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid audio")
     return {"text": _stt(audio, "audio.webm", query.content_type)}
-
 
 @app.post("/api/count")
 def count_word(query: CountQuery, request: Request):
@@ -707,7 +672,6 @@ def count_word(query: CountQuery, request: Request):
         "examples": examples,
         "total_verses_with_word": int(mask.sum()),
     }
-
 
 @app.get("/api/related/{surah}/{ayah}")
 def related(surah: int, ayah: int, request: Request, limit: int = 6):
@@ -741,7 +705,6 @@ def related(surah: int, ayah: int, request: Request, limit: int = 6):
     meta = {r[0]: r[1:] for r in rows}
     return {"results": [dict(zip(QURAN_COLS, meta[i]), score=score[i]) for i in ids if i in meta]}
 
-
 @app.get("/api/words/{surah}/{ayah}")
 def words(surah: int, ayah: int, request: Request):
     _rate_limit(request, 40)
@@ -754,15 +717,12 @@ def words(surah: int, ayah: int, request: Request):
         if w.get("char_type_name") == "word"
     ]}
 
-
 @app.get("/api/tafsir/{surah}/{ayah}")
 def tafsir(surah: int, ayah: int, request: Request):
     _rate_limit(request, 40)
     return {"tafsir": _fetch_tafsir(f"{surah}:{ayah}")}
 
-
 TRANSLATIONS = {20: "Saheeh International", 19: "Pickthall", 22: "Yusuf Ali", 85: "Abdel Haleem"}
-
 
 @app.get("/api/translations/{surah}/{ayah}")
 def translations(surah: int, ayah: int, request: Request):
@@ -776,12 +736,10 @@ def translations(surah: int, ayah: int, request: Request):
         for t in data.get("verse", {}).get("translations", [])
     ]}
 
-
 @app.get("/api/chapters")
 def chapters(request: Request):
     _rate_limit(request, 40)
     return {"chapters": _data_file("chapters.json")}
-
 
 @app.get("/api/daily")
 def daily(request: Request):
@@ -800,12 +758,10 @@ def daily(request: Request):
     ).fetchone()
     return {"verse": dict(zip(QURAN_COLS, row)) if row else None}
 
-
 JUZ_STARTS = [(1, 1), (2, 142), (2, 253), (3, 93), (4, 24), (4, 148), (5, 82), (6, 111), (7, 88),
               (8, 41), (9, 93), (11, 6), (12, 53), (15, 1), (17, 1), (18, 75), (21, 1), (23, 1),
               (25, 21), (27, 56), (29, 46), (33, 31), (36, 28), (39, 32), (41, 47), (46, 1),
               (51, 31), (58, 1), (67, 1), (78, 1)]
-
 
 @app.get("/api/juz/{n}")
 def juz(n: int, request: Request):
@@ -833,7 +789,6 @@ def juz(n: int, request: Request):
         rows = db.execute(f"SELECT {cols} FROM quran_metadata WHERE verse_id>=? AND verse_id<? ORDER BY verse_id", [start, end]).fetchall()
     return {"juz": n, "verses": [dict(zip(QURAN_COLS, r)) for r in rows]}
 
-
 @app.get("/api/analytics/surah")
 def surah_analytics(request: Request):
     df = request.app.state.df_verses
@@ -845,7 +800,6 @@ def surah_analytics(request: Request):
         "longest_surah": {"number": int(sizes.idxmax()), "verses": int(sizes.max())},
     }
 
-
 @app.get("/api/analytics/frequency")
 def word_frequency(request: Request):
     df = request.app.state.df_verses
@@ -854,7 +808,6 @@ def word_frequency(request: Request):
         "words": dict(Counter(words).most_common(20)),
         "total_unique_words": len(set(words)),
     }
-
 
 @app.get("/api/analytics/distribution")
 def theme_distribution(request: Request):
@@ -866,7 +819,6 @@ def theme_distribution(request: Request):
         for theme, keywords in THEMES.items()
     }
     return {"themes": distribution}
-
 
 @app.get("/api/analytics/themes")
 def theme_clusters(request: Request):
@@ -896,7 +848,6 @@ def theme_clusters(request: Request):
         s.cache["themes"] = themes
     return {"themes": s.cache["themes"]}
 
-
 @app.get("/api/analytics/wordcloud")
 def wordcloud(request: Request):
     s = request.app.state
@@ -921,7 +872,6 @@ def wordcloud(request: Request):
         )
     return {"wordcloud_image": s.cache["wordcloud"]}
 
-
 @app.get("/api/search/surah/{surah_no}")
 def get_surah(surah_no: int, request: Request):
     df = request.app.state.df_verses
@@ -936,7 +886,6 @@ def get_surah(surah_no: int, request: Request):
             for _, r in verses.iterrows()
         ],
     }
-
 
 if __name__ == "__main__":
     import uvicorn
