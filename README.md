@@ -17,7 +17,7 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 
 ## What it does
 
-- **Semantic search** in either Arabic or English; returns top matches across the Quran + major Hadith collections
+- **Semantic search** in either Arabic or English; returns top matches across the Quran + Sahih Bukhari & Sahih Muslim
 - **Reference lookup** (e.g. `2:255`) resolves directly to the verse
 - **Grounded Q&A (RAG)** - retrieves the most relevant verses and hadith, then an LLM writes a cited answer from *only* those passages
 - **Voice search** - speak a question; it's transcribed and run through whichever mode you're in
