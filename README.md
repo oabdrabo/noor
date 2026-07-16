@@ -41,12 +41,13 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 ```sh
 pip install -r requirements.txt
 export NOOR_DATA_DIR=./data   # holds quran-dataset.csv; models and vectors.db are created here
+python prepare_dataset.py     # one-time: builds quran-dataset.csv (6,236 verses)
 python main.py
 # API on http://localhost:8000
 # Frontend served via nginx at http://localhost:3000 (see nginx.conf)
 ```
 
-`NOOR_DATA_DIR` defaults to `/config`. The Quran CSV must be present there; Hadith collections are fetched from a CDN on first run.
+`NOOR_DATA_DIR` defaults to `/config`. `prepare_dataset.py` builds the Quran CSV there from [quran-json](https://github.com/risan/quran-json) (Saheeh International translation, CC-BY-SA 4.0); Hadith collections are fetched from a CDN on first run.
 
 ## Architecture notes
 
