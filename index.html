@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Noor · نور</title>
+  <title>Noor - نور</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2313110b'/%3E%3Ctext x='16' y='23' font-size='16' text-anchor='middle' fill='%23dcab4e' font-family='sans-serif'%3E%D9%86%D9%88%D8%B1%3C/text%3E%3C/svg%3E">
   <meta name="description" content="Semantic search across the Qur'an & Hadith">
   <meta name="theme-color" content="#f6f1e7">
@@ -90,7 +90,7 @@
     <div v-if="mode==='qa'" class="-mt-1.5 mb-4 text-sm text-ink-3">
       <label class="inline-flex items-center gap-2 cursor-pointer">
         <input type="checkbox" v-model="onlineSearch" class="w-4 h-4 accent-gold">
-        {{ar?'بحث على الإنترنت · تفسير ابن كثير (Quran.com)':'Search online · Ibn Kathir tafsir (Quran.com)'}}
+        {{ar?'بحث على الإنترنت، تفسير ابن كثير (Quran.com)':'Search online, Ibn Kathir tafsir (Quran.com)'}}
       </label>
     </div>
     <div class="flex gap-2.5 mb-4 flex-wrap items-center" v-if="mode==='search' && searched && source==='quran'">
@@ -125,7 +125,7 @@
 
       <template v-if="(mode==='qa'||mode==='reflect') && qaAnswer">
         <div class="rounded-2xl border border-gold/30 bg-gold/10 p-5" v-if="qaAnswer.answer">
-          <div class="text-2xs tracking-widest uppercase text-gold font-semibold mb-2.5">{{tr.answer}} · {{tr.groundedIn}} {{qaAnswer.citations?.length||0}} {{tr.sources}}<span v-if="qaAnswer.online" class="ms-2 text-gold">· {{ar?'تفسير':'+'}} {{qaAnswer.online.label}} ({{qaAnswer.online.via}})</span></div>
+          <div class="text-2xs tracking-widest uppercase text-gold font-semibold mb-2.5">{{tr.answer}}, {{tr.groundedIn}} {{qaAnswer.citations?.length||0}} {{tr.sources}}<span v-if="qaAnswer.online" class="ms-2 text-gold">{{ar?'تفسير':'+'}} {{qaAnswer.online.label}} ({{qaAnswer.online.via}})</span></div>
           <div class="text-ink leading-relaxed" v-html="mdLite(qaAnswer.answer)"></div>
         </div>
         <div class="text-2xs tracking-widest uppercase text-ink-3 font-semibold mt-1" v-if="qaAnswer.citations?.length">{{tr.sourcesH}}</div>
@@ -192,7 +192,7 @@
           <div class="flex items-center gap-2 flex-wrap mb-4">
             <button class="flex items-center gap-1.5 text-xs text-ink-2 px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors" @click="browseSurah=null;browseJuz=null"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-none stroke-2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> {{tr.back}}</button>
             <button class="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors" :class="surahPlaying?'text-gold':'text-ink-2'" @click="playSurah"><svg viewBox="0 0 24 24" class="w-3.5 h-3.5 stroke-current fill-current stroke-1"><path v-if="surahPlaying" d="M6 5h4v14H6zM14 5h4v14h-4z"/><path v-else d="M6 4l14 8-14 8z"/></svg> {{surahPlaying?tr.stopSurah:tr.playSurah}}</button>
-            <span class="text-xs text-ink-3">{{browseJuz?tr.juz+' '+browseJuz:tr.surah+' '+browseSurah}} · {{browseSurahData?.verses?.length||browseSurahData?.total_verses||0}} {{tr.verses}}</span>
+            <span class="text-xs text-ink-3">{{browseJuz?tr.juz+' '+browseJuz:tr.surah+' '+browseSurah}}, {{browseSurahData?.verses?.length||browseSurahData?.total_verses||0}} {{tr.verses}}</span>
           </div>
           <div class="flex flex-col gap-4">
             <verse-card v-for="bv in browseSurahData?.verses||[]" :key="(bv.surah||browseSurah)+':'+bv.ayah" :v="{surah:bv.surah||browseSurah,ayah:bv.ayah,text:bv.text,translation:bv.translation}"></verse-card>
@@ -211,7 +211,7 @@
       </div>
     </div>
 
-    <div class="text-center text-xs text-ink-3 mt-16">نُور - &ldquo;light&rdquo; · meaning over keywords</div>
+    <div class="text-center text-xs text-ink-3 mt-16">نُور - &ldquo;light&rdquo;, meaning over keywords</div>
   </div>
 
   <div class="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl bg-ink text-bg text-sm font-medium shadow-lg transition-all duration-300 z-50" :class="toast?'opacity-100 translate-y-0':'opacity-0 translate-y-4 pointer-events-none'">{{toast}}</div>
@@ -266,7 +266,7 @@ const VerseCard={
         <span class="flex flex-col items-center bg-surface border border-gold/30 rounded-lg px-2.5 py-1.5 min-w-11" v-for="(w,wi) in verseWords[v.surah+':'+v.ayah]" :key="wi"><span class="font-ar text-xl leading-normal text-ink">{{w.ar}}</span><span class="text-2xs text-ink-3 mt-0.5" dir="ltr">{{w.en}}</span></span>
       </div>
       <div class="mt-3 p-3.5 bg-gold/10 border border-gold/30 rounded-xl" v-if="verseTafsir[v.surah+':'+v.ayah]!==undefined">
-        <div class="font-ui text-2xs text-gold uppercase tracking-widest mb-2">{{tr.tafsir}} · Ibn Kathir</div>
+        <div class="font-ui text-2xs text-gold uppercase tracking-widest mb-2">{{tr.tafsir}}, Ibn Kathir</div>
         <div v-if="verseTafsir[v.surah+':'+v.ayah]" class="text-sm leading-relaxed text-ink-2">{{verseTafsir[v.surah+':'+v.ayah]}}</div>
         <div v-else class="flex justify-center py-2"><span class="w-4 h-4 rounded-full border-2 border-gold border-t-transparent animate-spin"></span></div>
       </div>
@@ -322,8 +322,8 @@ createApp({
     const lang=ref(localStorage.getItem('noor-lang')||'en')
     const ar=computed(()=>lang.value==='ar')
     const STR={
-      en:{tagline:"Semantic search · Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',dailyVerse:'Verse of the day',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',translations:'Translations',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',share:'Share',study:'Study',sourceQuran:'Qur’an',sourceHadith:'Hadith',explore:'Explore',playSurah:'Play surah',stopSurah:'Stop',juz:'Juz',back:'Back',switchLang:'العربية'},
-      ar:{tagline:'بحث دلالي · القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',dailyVerse:'آية اليوم',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',translations:'ترجمات',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',share:'مشاركة',study:'دراسة',sourceQuran:'قرآن',sourceHadith:'حديث',explore:'استكشاف',playSurah:'تشغيل السورة',stopSurah:'إيقاف',juz:'جزء',back:'رجوع',switchLang:'English'},
+      en:{tagline:"Semantic search, Qur'an & Hadith",verses:'verses',hadith:'hadith',bookmarks:'Bookmarks',noBookmarks:'No bookmarks yet - save a verse to keep it here.',allSurahs:'All Surahs',surah:'Surah',results:'results',tryLabel:'Try',dailyVerse:'Verse of the day',answer:'Answer',groundedIn:'grounded in',sources:'sources',sourcesH:'Sources',appearsIn:'appears in',inVerses:'verses',theme:'Theme',surahs:'Surahs',versesC:'Verses',avgSurah:'Avg / Surah',uniqueWords:'Unique Words',themeDist:'Theme Distribution',wordCloud:'Word Cloud',nothing:'Nothing found',tryOther:'Try different words, or another mode.',lightMode:'Light mode',darkMode:'Dark mode',voice:'Voice search',stopRec:'Stop recording',listen:'Listen',words:'Words',tafsir:'Tafsir',translations:'Translations',relatedH:'Related verses',copy:'Copy',save:'Save',saved:'Saved',share:'Share',study:'Study',sourceQuran:'Qur’an',sourceHadith:'Hadith',explore:'Explore',playSurah:'Play surah',stopSurah:'Stop',juz:'Juz',back:'Back',switchLang:'العربية'},
+      ar:{tagline:'بحث دلالي، القرآن والحديث',verses:'آية',hadith:'حديث',bookmarks:'المحفوظات',noBookmarks:'لا محفوظات بعد، احفظ آية لتظهر هنا.',allSurahs:'كل السور',surah:'سورة',results:'نتيجة',tryLabel:'جرّب',dailyVerse:'آية اليوم',answer:'الإجابة',groundedIn:'مستندة إلى',sources:'مصدر',sourcesH:'المصادر',appearsIn:'وردت في',inVerses:'آية',theme:'موضوع',surahs:'السور',versesC:'الآيات',avgSurah:'متوسط/سورة',uniqueWords:'كلمات فريدة',themeDist:'توزيع المواضيع',wordCloud:'سحابة الكلمات',nothing:'لا توجد نتائج',tryOther:'جرّب كلمات أخرى أو وضعًا آخر.',lightMode:'الوضع الفاتح',darkMode:'الوضع الداكن',voice:'بحث صوتي',stopRec:'إيقاف التسجيل',listen:'استماع',words:'كلمة بكلمة',tafsir:'تفسير',translations:'ترجمات',relatedH:'آيات ذات صلة',copy:'نسخ',save:'حفظ',saved:'محفوظ',share:'مشاركة',study:'دراسة',sourceQuran:'قرآن',sourceHadith:'حديث',explore:'استكشاف',playSurah:'تشغيل السورة',stopSurah:'إيقاف',juz:'جزء',back:'رجوع',switchLang:'English'},
     }
     const tr=computed(()=>STR[lang.value])
 
@@ -632,7 +632,7 @@ createApp({
         let y=300;_wrap(x,r.text,W-2*P).forEach(l=>{x.fillText(l,W/2,y);y+=84})
         x.direction='ltr';x.fillStyle=dk?'#b3a892':'#6f6657';x.font='400 34px Inter';y+=46
         _wrap(x,r.translation,W-2*P).forEach(l=>{x.fillText(l,W/2,y);y+=50})
-        x.fillStyle=dk?'#d9b56b':'#a07d2c';x.font='700 44px Amiri';x.fillText('نور · Noor',W/2,W-72)
+        x.fillStyle=dk?'#d9b56b':'#a07d2c';x.font='700 44px Amiri';x.fillText('نور - Noor',W/2,W-72)
         c.toBlob(b=>{
           const f=new File([b],'noor-verse.png',{type:'image/png'})
           if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'Noor'}).catch(()=>{})
