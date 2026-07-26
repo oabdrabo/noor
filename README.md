@@ -24,7 +24,7 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 - **Vector store** backed by `sqlite-vec` - embeddings live in a single SQLite file, no separate DB to operate
 - **TF-IDF + KMeans clustering** for topic discovery and concept maps
 - **Word-cloud generation** over the corpus
-- **Light & dark**, Arabic-first single-file Vue 3 frontend · FastAPI backend · nginx edge
+- **Light & dark**, Arabic-first single-file Vue 3 frontend, FastAPI backend, nginx edge
 
 ## Stack
 
