@@ -13,3 +13,4 @@ venv/
 
 node_modules/
 src/build-tmp/
+.claude/

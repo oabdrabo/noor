@@ -2,7 +2,7 @@
 
 AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arabic + English) embeddings with sub-second response on a single-node deployment.
 
-نُور - *"light"* in Arabic.
+نُور - _"light"_ in Arabic.
 
 **Try it: [app.noor.pyxis3.ai](https://app.noor.pyxis3.ai)** - type a question in Arabic or English ("verses about patience in adversity", "حديث عن حقوق الجار") and get matches by meaning, not keyword. ([noor.pyxis3.ai](https://noor.pyxis3.ai) is the project landing.)
 
@@ -19,7 +19,7 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 
 - **Semantic search** in either Arabic or English; returns top matches across the Quran + Sahih Bukhari & Sahih Muslim
 - **Reference lookup** (e.g. `2:255`) resolves directly to the verse
-- **Grounded Q&A (RAG)** - retrieves the most relevant verses and hadith, then an LLM writes a cited answer from *only* those passages
+- **Grounded Q&A (RAG)** - retrieves the most relevant verses and hadith, then an LLM writes a cited answer from _only_ those passages
 - **Voice search** - speak a question; it's transcribed and run through whichever mode you're in
 - **Vector store** backed by `sqlite-vec` - embeddings live in a single SQLite file, no separate DB to operate
 - **TF-IDF + KMeans clustering** for topic discovery and concept maps
@@ -28,13 +28,13 @@ AI-powered semantic search over the Quran and Hadith corpora. Multilingual (Arab
 
 ## Stack
 
-| Layer | Choice | Why |
-|---|---|---|
-| Embeddings | `intfloat/multilingual-e5-small` (384-dim) | Strong multilingual baseline; small enough to run on CPU |
-| Vector store | `sqlite-vec` | Zero-ops, file-backed, deployable on any host |
-| API | FastAPI + Pydantic v2 | Async + automatic schema |
-| Frontend | Vue 3 via CDN (no build step) | One HTML file, fastest possible iteration |
-| Edge | nginx | Static + reverse proxy to `/api/` |
+| Layer        | Choice                                     | Why                                                      |
+| ------------ | ------------------------------------------ | -------------------------------------------------------- |
+| Embeddings   | `intfloat/multilingual-e5-small` (384-dim) | Strong multilingual baseline; small enough to run on CPU |
+| Vector store | `sqlite-vec`                               | Zero-ops, file-backed, deployable on any host            |
+| API          | FastAPI + Pydantic v2                      | Async + automatic schema                                 |
+| Frontend     | Vue 3 via CDN (no build step)              | One HTML file, fastest possible iteration                |
+| Edge         | nginx                                      | Static + reverse proxy to `/api/`                        |
 
 ## Run locally
 
@@ -59,7 +59,7 @@ Q&A and voice are backed by two optional services, reached server-side so no mod
 
 ## Why
 
-Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that answers *intent* questions - *"verses about patience in adversity"*, *"hadith on neighbours' rights"* - and surfaces matches by meaning, not surface form. Multilingual embeddings make this practical; `sqlite-vec` makes it deployable on a Raspberry Pi.
+Modern Quran/Hadith study tools are mostly keyword search. I wanted a tool that answers _intent_ questions - _"verses about patience in adversity"_, _"hadith on neighbours' rights"_ - and surfaces matches by meaning, not surface form. Multilingual embeddings make this practical; `sqlite-vec` makes it deployable on a Raspberry Pi.
 
 ## Contributing
 

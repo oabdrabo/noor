@@ -1,14 +1,59 @@
 @import "tailwindcss";
 
-@font-face{font-family:"Amiri";font-weight:400;font-display:swap;src:url("/assets/fonts/amiri-arabic-400-normal.woff2") format("woff2")}
-@font-face{font-family:"Amiri";font-weight:700;font-display:swap;src:url("/assets/fonts/amiri-arabic-700-normal.woff2") format("woff2")}
-@font-face{font-family:"Cormorant Garamond";font-weight:500;font-display:swap;src:url("/assets/fonts/cormorant-garamond-latin-500-normal.woff2") format("woff2")}
-@font-face{font-family:"Cormorant Garamond";font-weight:600;font-display:swap;src:url("/assets/fonts/cormorant-garamond-latin-600-normal.woff2") format("woff2")}
-@font-face{font-family:"Cormorant Garamond";font-weight:700;font-display:swap;src:url("/assets/fonts/cormorant-garamond-latin-700-normal.woff2") format("woff2")}
-@font-face{font-family:"Inter";font-weight:400;font-display:swap;src:url("/assets/fonts/inter-latin-400-normal.woff2") format("woff2")}
-@font-face{font-family:"Inter";font-weight:500;font-display:swap;src:url("/assets/fonts/inter-latin-500-normal.woff2") format("woff2")}
-@font-face{font-family:"Inter";font-weight:600;font-display:swap;src:url("/assets/fonts/inter-latin-600-normal.woff2") format("woff2")}
-@font-face{font-family:"Inter";font-weight:700;font-display:swap;src:url("/assets/fonts/inter-latin-700-normal.woff2") format("woff2")}
+@font-face {
+  font-family: "Amiri";
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/fonts/amiri-arabic-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Amiri";
+  font-weight: 700;
+  font-display: swap;
+  src: url("/assets/fonts/amiri-arabic-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-weight: 500;
+  font-display: swap;
+  src: url("/assets/fonts/cormorant-garamond-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-weight: 600;
+  font-display: swap;
+  src: url("/assets/fonts/cormorant-garamond-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-weight: 700;
+  font-display: swap;
+  src: url("/assets/fonts/cormorant-garamond-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/fonts/inter-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-weight: 500;
+  font-display: swap;
+  src: url("/assets/fonts/inter-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-weight: 600;
+  font-display: swap;
+  src: url("/assets/fonts/inter-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-weight: 700;
+  font-display: swap;
+  src: url("/assets/fonts/inter-latin-700-normal.woff2") format("woff2");
+}
 
 @theme {
   --color-bg: #f6f1e7;
