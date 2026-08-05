@@ -3,11 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tailwindcss -i src/app.css -o assets/app.css --minify"
+    "build": "tailwindcss -i src/app.css -o assets/app.css --minify",
+    "format": "prettier --write .",
+    "lint": "prettier --check .",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.1",
-    "tailwindcss": "^4.3.1"
+    "tailwindcss": "^4.3.1",
+    "prettier": "latest"
   },
   "dependencies": {
     "@fontsource/amiri": "^5.2.8",
